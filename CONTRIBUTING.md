@@ -164,7 +164,6 @@ git branch -d feature/student-login
 
 GitHub Actions runs automatically on pushes to `main` and `sprint`, and on pull requests targeting either branch.
 
-All required CI checks should pass before merging.
+The `Repository checks` job verifies that `README.md` and `CONTRIBUTING.md` exist and are not empty. All required CI checks should pass before merging.
 
----
-**The current workflow only checks out the code. Build, test, and security checks have not been added yet.**
+Application tests, builds, and security checks will be added when there is application code to validate. Deployment is not configured yet.

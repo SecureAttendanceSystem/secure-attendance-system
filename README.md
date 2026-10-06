@@ -42,7 +42,7 @@ Read the [project proposal](docs/Smart_Attendance_Proposal.pdf) for the full sco
 ## Repository Structure
 
 ```text
-.github/workflows/ci.yml             GitHub Actions CI scaffold
+.github/workflows/ci.yml             Basic repository checks
 backend/                            Placeholder for backend code
 docs/Smart_Attendance_Proposal.pdf   Capstone project proposal
 frontend/                           Placeholder for application code
@@ -66,6 +66,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, Git commands, review e
 
 The [CI workflow](.github/workflows/ci.yml) runs on pushes to `main` and `sprint`, and on pull requests targeting either branch.
 
-Its frontend and backend jobs currently only check out the repository. Dependency installation, tests, builds, and security checks have not been added, so a successful run does not yet validate the application.
+The workflow checks that `README.md` and `CONTRIBUTING.md` exist and are not empty. Application tests, builds, and security checks will be added when there is application code to validate.
 
 Continuous deployment is not configured. Deployment workflows will be defined after the application stack and hosting targets are selected.
