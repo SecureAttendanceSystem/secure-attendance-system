@@ -1,0 +1,1 @@
+"""Secure Attendance backend."""
