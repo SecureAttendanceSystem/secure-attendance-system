@@ -1,0 +1,40 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      target: development
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-18000}:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://attendance:attendance_dev@db:5432/attendance}
+      APP_NAME: ${APP_NAME:-Secure Attendance API}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000"]}'
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini:ro
+      - ./backend/tests:/app/tests:ro
+      - ./backend/pyproject.toml:/app/pyproject.toml:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: attendance
+      POSTGRES_PASSWORD: attendance_dev
+      POSTGRES_DB: attendance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance -d attendance"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
