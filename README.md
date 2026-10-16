@@ -2,11 +2,7 @@
 
 Project foundation for a university attendance system: a Next.js web application,
 an Expo mobile application, and a shared FastAPI backend with PostgreSQL.
-The frontends currently contain starter screens; application features and API
-integration come later.
 
-See the [technology stack](docs/architecture/README.md) and
-[project proposal](docs/Smart_Attendance_Proposal.pdf).
 
 ## Prerequisites
 
