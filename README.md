@@ -92,7 +92,6 @@ npm start
 
 Scan the QR code with compatible Expo Go on a phone on the same network.
 See [mobile setup](mobile/README.md) for emulator instructions.
-Each developer runs their own applications; a teammate's PC does not need to stay on.
 
 ## Checks and common commands
 
@@ -112,8 +111,7 @@ changing dependencies. After editing `.env`, run
 
 GitHub Actions runs frontend lint/TypeScript checks, backend tests, Docker builds,
 migration checks, and API/database health checks on pull requests to `sprint` or
-`main`, pushes to those branches, and manual runs. CI uses a temporary local
-database and needs no Supabase secrets.
+`main`, pushes to those branches, and manual runs.
 
 ## Repository
 
