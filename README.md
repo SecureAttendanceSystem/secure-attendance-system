@@ -111,7 +111,7 @@ changing dependencies. After editing `.env`, run
 GitHub Actions runs frontend lint/TypeScript checks, backend tests, Docker builds,
 migration checks, and API/database health checks on pull requests to `sprint` or
 `main`, pushes to those branches, and manual runs. CI uses a temporary local
-database and needs no Supabase secrets. Setup still needs verification by another teammate.
+database and needs no Supabase secrets.
 
 ## Repository
 
