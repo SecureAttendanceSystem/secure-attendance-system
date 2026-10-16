@@ -27,7 +27,6 @@ In PowerShell, use `npm.cmd` and `npx.cmd` if script execution is blocked.
 ```bash
 git clone https://github.com/SecureAttendanceSystem/secure-attendance-system.git
 cd secure-attendance-system
-git switch sprint
 ```
 
 When testing an unmerged change, select its branch instead of `sprint`.
@@ -129,8 +128,3 @@ docs/               Technology stack and project proposal
 docker-compose.yml  Backend and local PostgreSQL services
 .env.example        Shareable backend settings template
 ```
-
-Alembic migrations live in `backend/alembic/versions/`.
-Empty scaffolding folders use `.gitkeep` so Git preserves them.
-More commands: [backend](backend/README.md), [web](web/README.md),
-[mobile](mobile/README.md), and [contribution workflow](CONTRIBUTING.md).
