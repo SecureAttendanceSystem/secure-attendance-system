@@ -1,18 +1,375 @@
-.main {
+/* These tokens give the student-built sign-in page a restrained, consistent color palette. */
+.page {
+  --ink: #263348;
+  --muted: #748096;
+  --line: #e2e7ef;
+  --blue: #3659b9;
   min-height: 100vh;
+  padding: 0 28px 38px;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse at 50% 20%, #fff 0%, #f5f7fb 68%),
+    #f5f7fb;
+}
+
+/* This simple header identifies the app and its university without a large hero panel. */
+.header {
+  width: min(100%, 1000px);
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.45px;
+  text-decoration: none;
+}
+
+.brandMark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--blue);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.school {
+  color: #8a93a3;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.65px;
+}
+
+/* This centered card keeps the first release focused on the two requested account flows. */
+.authCard {
+  width: min(100%, 410px);
+  margin: clamp(55px, 11vh, 100px) auto 0;
+  padding: 31px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 10px 32px rgb(30 46 75 / 7%);
+}
+
+.cardHeading {
+  margin-bottom: 22px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--blue);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+}
+
+.cardHeading h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 25px;
+  letter-spacing: -0.7px;
+}
+
+.cardHeading > p:last-child {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* These tabs switch between sign-in and account creation without introducing extra pages. */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 21px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #f1f3f7;
+}
+
+.tabs button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  color: #788397;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tabs .selectedTab {
+  color: #2c3c58;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(24 39 68 / 10%);
+}
+
+/* This form styling keeps labels, fields, and buttons clear on both account flows. */
+.form {
   display: flex;
   flex-direction: column;
+}
+
+.form label {
+  margin: 0 0 6px;
+  color: #46536a;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.form label:not(:first-child) {
+  margin-top: 15px;
+}
+
+.form input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  outline: none;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+}
+
+.form input::placeholder {
+  color: #a0a8b6;
+}
+
+.form input:focus {
+  border-color: #8099d8;
+  box-shadow: 0 0 0 3px rgb(54 89 185 / 10%);
+}
+
+/* These role choices make student and professor registration equally easy to understand. */
+.roleButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.roleButtons button {
+  min-height: 37px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: #69758a;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.roleButtons .selectedRole {
+  border-color: #91a5d7;
+  color: #31529e;
+  background: #f6f8fd;
+}
+
+/* This face section makes the required enrollment step part of sign-up rather than an afterthought. */
+.faceSection {
+  display: grid;
+  gap: 9px;
+  margin-top: 17px;
+  padding: 12px;
+  border: 1px solid #e7ebf1;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.faceHeading,
+.facePreviewRow {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 24px;
-  text-align: center;
+  gap: 9px;
 }
 
-.main h1 {
-  font-size: clamp(1.5rem, 5vw, 2.5rem);
+.faceHeading > span:first-child,
+.facePreviewRow > span {
+  display: grid;
+  gap: 4px;
 }
 
-.main p {
+.faceHeading strong,
+.facePreviewRow strong {
+  color: #46536a;
+  font-size: 10px;
+}
+
+.faceHeading small,
+.facePreviewRow small {
+  color: #8a93a3;
+  font-size: 9px;
+}
+
+.required {
+  margin-left: auto;
+  color: #66779a;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.cameraPreview {
+  height: 126px;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  border: 1px dashed #d7dde7;
+  border-radius: 7px;
+  color: #8b94a4;
+  background: #f2f4f8;
+  font-size: 10px;
+}
+
+.cameraPreview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.hiddenCanvas {
+  display: none;
+}
+
+.facePreview {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  background-position: center;
+  background-size: cover;
+}
+
+.facePreviewRow {
+  min-height: 60px;
+}
+
+.retakeButton,
+.cameraButton {
+  min-height: 34px;
+  border: 1px solid #dfe5ee;
+  border-radius: 6px;
+  color: #465b91;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.retakeButton {
+  margin-left: auto;
+  padding: 0 9px;
+}
+
+.cameraButton {
+  width: 100%;
+}
+
+.cameraButton:hover,
+.retakeButton:hover {
+  border-color: #9badd4;
+  background: #f7f9fd;
+}
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #69758a;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.consent input {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+/* These messages explain demo validation and submission outcomes directly in the form. */
+.error,
+.message {
+  margin: 12px 0 0;
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 10px;
   line-height: 1.5;
+}
+
+.error {
+  border: 1px solid #f0d7d7;
+  color: #a33f3f;
+  background: #fff7f7;
+}
+
+.message {
+  border: 1px solid #dce8dc;
+  color: #416b4b;
+  background: #f6fbf6;
+}
+
+.submitButton {
+  min-height: 41px;
+  margin-top: 19px;
+  border: 0;
+  border-radius: 7px;
+  color: #fff;
+  background: var(--blue);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  transition: background 150ms ease;
+}
+
+.submitButton:hover {
+  background: #2c4b9f;
+}
+
+/* This focus style makes keyboard navigation visible on the authentication controls. */
+.page :focus-visible {
+  outline: 3px solid rgb(54 89 185 / 38%);
+  outline-offset: 2px;
+}
+
+/* This compact layout preserves comfortable spacing on phones. */
+@media (max-width: 520px) {
+  .page {
+    padding: 0 15px 25px;
+  }
+
+  .header {
+    min-height: 60px;
+  }
+
+  .school {
+    max-width: 145px;
+    font-size: 7px;
+    text-align: right;
+  }
+
+  .authCard {
+    margin-top: 48px;
+    padding: 24px 20px;
+  }
 }

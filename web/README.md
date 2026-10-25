@@ -16,6 +16,20 @@ npm run dev
 Open http://localhost:3000. Stop with Ctrl+C; edits reload automatically.
 Docker runs the backend and database separately.
 
+## Login and sign-up preview
+
+The frontend currently contains only the login and sign-up screens. Use either
+sample account to test the login form:
+
+- Student: `student@unb.ca` / `Student123!`
+- Professor: `professor@unb.ca` / `Professor123!`
+
+Sign-up lets you choose a student or professor account and requires a temporary
+camera preview. The preview stays in browser memory and is not uploaded, saved,
+or matched. Demo accounts are kept in page memory and reset when the page is
+refreshed. Authentication and face verification still need a backend before
+accounts can be used beyond this prototype.
+
 ## Checks
 
 From `web/`:
