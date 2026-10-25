@@ -30,6 +30,21 @@ class CheckKind(str, Enum):
     QR = "qr"
 
 
+class CheckOutcome(str, Enum):
+    PASS = "pass"
+    FAIL = "fail"
+    SKIPPED = "skipped"
+    ERROR = "error"
+
+
+class AttendanceStatus(str, Enum):
+    PRESENT = "present"
+    REJECTED = "rejected"
+    FLAGGED = "flagged"
+    EXCUSED = "excused"
+    ABSENT = "absent"
+
+
 def enum_column(enum_class: type[Enum], name: str) -> SQLEnum:
     """Build the column type with the same options user.py uses for UserRole.
 
