@@ -9,6 +9,11 @@ from enum import Enum
 from sqlalchemy import Enum as SQLEnum
 
 
+class DevicePlatform(str, Enum):
+    IOS = "ios"
+    ANDROID = "android"
+
+
 class SessionStatus(str, Enum):
     SCHEDULED = "scheduled"
     ACTIVE = "active"
