@@ -181,6 +181,138 @@
   background: #f6f8fd;
 }
 
+/* This face section makes the required enrollment step part of sign-up rather than an afterthought. */
+.faceSection {
+  display: grid;
+  gap: 9px;
+  margin-top: 17px;
+  padding: 12px;
+  border: 1px solid #e7ebf1;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.faceHeading,
+.facePreviewRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.faceHeading > span:first-child,
+.facePreviewRow > span {
+  display: grid;
+  gap: 4px;
+}
+
+.faceHeading strong,
+.facePreviewRow strong {
+  color: #46536a;
+  font-size: 10px;
+}
+
+.faceHeading small,
+.facePreviewRow small {
+  color: #8a93a3;
+  font-size: 9px;
+}
+
+.required {
+  margin-left: auto;
+  color: #66779a;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.cameraPreview {
+  height: 126px;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  border: 1px dashed #d7dde7;
+  border-radius: 7px;
+  color: #8b94a4;
+  background: #f2f4f8;
+  font-size: 10px;
+}
+
+.cameraPreview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.hiddenCanvas {
+  display: none;
+}
+
+.facePreview {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  background-position: center;
+  background-size: cover;
+}
+
+.facePreviewRow {
+  min-height: 60px;
+}
+
+.retakeButton,
+.cameraButton {
+  min-height: 34px;
+  border: 1px solid #dfe5ee;
+  border-radius: 6px;
+  color: #465b91;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.retakeButton {
+  margin-left: auto;
+  padding: 0 9px;
+}
+
+.cameraButton {
+  width: 100%;
+}
+
+.cameraButton:hover,
+.retakeButton:hover {
+  border-color: #9badd4;
+  background: #f7f9fd;
+}
+
+.privacyNote {
+  margin: 0;
+  color: #838d9d;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #69758a;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.consent input {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
 /* These messages explain demo validation and submission outcomes directly in the form. */
 .error,
 .message {
@@ -246,6 +378,12 @@
   color: #9aa2ae;
   font-size: 9px;
   text-align: center;
+}
+
+/* This focus style makes keyboard navigation visible on the authentication controls. */
+.page :focus-visible {
+  outline: 3px solid rgb(54 89 185 / 38%);
+  outline-offset: 2px;
 }
 
 /* This compact layout preserves comfortable spacing on phones. */
