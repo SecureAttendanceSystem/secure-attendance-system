@@ -45,6 +45,18 @@ class AttendanceStatus(str, Enum):
     ABSENT = "absent"
 
 
+class ChangeType(str, Enum):
+    DEVICE = "device"
+    FACE = "face"
+
+
+class RequestStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    DENIED = "denied"
+    CANCELLED = "cancelled"
+
+
 def enum_column(enum_class: type[Enum], name: str) -> SQLEnum:
     """Build the column type with the same options user.py uses for UserRole.
 
