@@ -289,13 +289,6 @@
   background: #f7f9fd;
 }
 
-.privacyNote {
-  margin: 0;
-  color: #838d9d;
-  font-size: 9px;
-  line-height: 1.5;
-}
-
 .consent {
   display: flex;
   align-items: flex-start;
@@ -351,33 +344,6 @@
 
 .submitButton:hover {
   background: #2c4b9f;
-}
-
-/* This note exposes the sample credentials needed for local interface testing. */
-.demoBox {
-  display: grid;
-  gap: 6px;
-  margin-top: 17px;
-  padding: 12px;
-  border: 1px solid #ebeff5;
-  border-radius: 7px;
-  color: #6c778b;
-  background: #fafbfd;
-  font-size: 9px;
-}
-
-.demoBox p {
-  margin: 0 0 2px;
-  color: #46536a;
-  font-size: 10px;
-  font-weight: 650;
-}
-
-.footerNote {
-  margin: 18px 0 0;
-  color: #9aa2ae;
-  font-size: 9px;
-  text-align: center;
 }
 
 /* This focus style makes keyboard navigation visible on the authentication controls. */

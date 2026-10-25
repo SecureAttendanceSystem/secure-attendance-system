@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  // This metadata describes the student- and professor-facing attendance prototype.
-  title: "Attendwise | Secure University Attendance",
+  // This metadata uses the project's name on the authentication screen and browser tab.
+  title: "Secure University Attendance System",
   description:
-    "A student-first university attendance experience for secure check-ins and class insights.",
+    "Secure attendance system for university students and professors.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

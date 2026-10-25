@@ -162,9 +162,9 @@ export default function Home() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <a aria-label="Attendwise home" className={styles.brand} href="#">
-          <span aria-hidden="true" className={styles.brandMark}>A</span>
-          <span>attendwise</span>
+        <a aria-label="Secure University Attendance System home" className={styles.brand} href="#">
+          <span aria-hidden="true" className={styles.brandMark}>SA</span>
+          <span>Secure Attendance System</span>
         </a>
         <span className={styles.school}>UNIVERSITY OF NEW BRUNSWICK</span>
       </header>
@@ -304,10 +304,6 @@ export default function Home() {
                   {cameraStream ? "Capture face preview" : "Start face registration"}
                 </button>
               )}
-              <p className={styles.privacyNote}>
-                This demo does not recognize, upload, or save face images. Real face verification
-                needs a university-approved service.
-              </p>
               <label className={styles.consent}>
                 <input
                   checked={privacyConsent}
@@ -327,17 +323,6 @@ export default function Home() {
           </button>
         </form>
 
-        {mode === "login" && (
-          <aside aria-label="Demo accounts" className={styles.demoBox}>
-            <p>Need a test account?</p>
-            <span>Student: student@unb.ca / Student123!</span>
-            <span>Professor: professor@unb.ca / Professor123!</span>
-          </aside>
-        )}
-
-        <p className={styles.footerNote}>
-          Frontend demo · Account details are not sent to a server
-        </p>
       </section>
     </main>
   );
