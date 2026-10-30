@@ -36,7 +36,6 @@ docker compose exec db psql -U attendance -d attendance
 
 ```bash
 docker compose exec backend pytest -p no:cacheprovider
-docker compose exec backend alembic check
 ```
 
 Tests cover health, settings, CORS, and exception handling without contacting
