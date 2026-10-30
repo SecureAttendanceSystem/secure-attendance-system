@@ -23,7 +23,8 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:17
+    # Postgres with the pgvector extension, needed for face embeddings
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: attendance
       POSTGRES_PASSWORD: attendance_dev
