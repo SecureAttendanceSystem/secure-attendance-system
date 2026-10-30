@@ -13,7 +13,7 @@ See the [technology stack](docs/architecture/README.md) and
 - [Docker Desktop](https://docs.docker.com/desktop/) running Linux containers.
 - [Expo Go compatible with SDK 57](https://expo.dev/go), or an Android emulator / macOS iOS simulator, for mobile preview.
 
-Docker provides Python 3.12 and PostgreSQL 17. A host Python installation,
+Docker provides Python 3.12 and PostgreSQL 17 with pgvector. A host Python installation,
 PostgreSQL installation, or Python virtual environment is not needed.
 If using Ubuntu in WSL, enable its integration in Docker Desktop and use that
 distro rather than `docker-desktop`. Use one terminal environment per checkout;
@@ -100,7 +100,6 @@ From the repository root:
 ```bash
 docker compose ps
 docker compose exec backend pytest -p no:cacheprovider
-docker compose exec backend alembic check
 docker compose logs -f backend
 ```
 
@@ -109,9 +108,10 @@ local database data persists. Rebuild with `docker compose up --build -d` after
 changing dependencies. After editing `.env`, run
 `docker compose up -d --force-recreate backend`.
 
-GitHub Actions runs frontend lint/TypeScript checks, backend tests, Docker builds,
-migration checks, and API/database health checks on pull requests to `sprint` or
-`main`, pushes to those branches, and manual runs.
+GitHub Actions runs on every push and on manual runs. It checks web and mobile
+lint/TypeScript, builds the backend, runs backend tests, applies migrations to a
+temporary database, and checks API/database health. Pull requests into `main`
+can only merge when CI passes.
 
 ## Repository
 
