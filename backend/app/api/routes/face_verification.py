@@ -65,6 +65,7 @@ def compare_faces(
         model_name=MODEL,
         distance_metric="cosine",
         silent=True,
+        anti_spoofing=True
     )
 
     return {
@@ -163,6 +164,7 @@ def verify_test(
         model_name=MODEL,
         distance_metric="cosine",
         silent=True,
+        anti_spoofing=True
     )
 
     return {
