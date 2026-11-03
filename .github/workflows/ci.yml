@@ -36,6 +36,11 @@ jobs:
         if: matrix.app == 'web'
         run: npx --no-install next typegen
       - run: npx --no-install tsc --noEmit
+      - name: Production build
+        if: matrix.app == 'web'
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
 
   backend:
     name: Backend tests and migrations
