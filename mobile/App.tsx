@@ -221,7 +221,7 @@ export default function App() {
               <View style={styles.infoBox}>
                 <Text style={styles.infoTitle}>Camera setup</Text>
                 <Text style={styles.infoDescription}>
-                  Next, we'll add camera access, selfie capture,
+                  Next, we&apos;ll add camera access, selfie capture,
                   and a review screen. Your photo will not be
                   uploaded during this step.
                 </Text>
