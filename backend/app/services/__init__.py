@@ -1,1 +1,1 @@
-"""Application operations for future features."""
+"""Application operations shared across routes, such as face embedding extraction."""

@@ -101,12 +101,13 @@ def test_login_rejects_wrong_password(app, client):
     assert response.json() == {"detail": "Incorrect email or password"}
 
 
-def test_login_rejects_unknown_email_with_the_same_message(app, client):
+@pytest.mark.parametrize("password", ["whatever123", "werkzeug.security"])
+def test_login_rejects_unknown_email_with_the_same_message(app, client, password):
     override_session(app, FakeSession(user=None))
 
     response = client.post(
         "/auth/login",
-        json={"email": "nobody@unb.ca", "password": "whatever123"},
+        json={"email": "nobody@unb.ca", "password": password},
     )
 
     assert response.status_code == 401

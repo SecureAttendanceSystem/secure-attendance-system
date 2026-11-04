@@ -16,12 +16,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
-from deepface import DeepFace
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.routes.face_verification import MODEL, get_embedding
+from app.services.face_embedding import MODEL, compare_face_embeddings, extract_face_embedding
 from app.core.config import get_settings
 from app.database.connection import create_database_engine
 from app.models.student_face_embedding import StudentFaceEmbedding
@@ -30,7 +29,7 @@ HERE = Path(__file__).resolve().parent
 IMAGE_TYPES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 FOLDERS = {"same_person": "Yes", "different_people": "No"}
 
-# get_embedding raises this message when one image contains several faces.
+# extract_face_embedding raises this message when one image contains several faces.
 # Every other failure there means no usable face was found.
 MULTIPLE_FACES = "The photo must contain exactly one face."
 
@@ -71,7 +70,7 @@ def evaluate_image(path: Path, expected: str, reference: list[float]) -> dict:
 
     try:
         with path.open("rb") as file:
-            embedding = get_embedding(SimpleNamespace(file=file))
+            embedding = extract_face_embedding(SimpleNamespace(file=file))
     except HTTPException as error:
         if error.detail == MULTIPLE_FACES:
             row["Face detected"] = "Yes"
@@ -81,20 +80,12 @@ def evaluate_image(path: Path, expected: str, reference: list[float]) -> dict:
     row["Face detected"] = "Yes"
 
     try:
-        # Same call as verify_test in face_verification.py.
-        result = DeepFace.verify(
-            img1_path=reference,
-            img2_path=embedding,
-            model_name=MODEL,
-            distance_metric="cosine",
-            silent=True,
-            anti_spoofing=True,
-        )
+        result = compare_face_embeddings(reference, embedding)
     except Exception as error:  # Record it rather than stop the whole run.
         row["Error detail"] = f"Verification failed: {error}"
         return row
 
-    matched = bool(result["verified"])
+    matched = result["matched"]
     row["Actual match"] = "Yes" if matched else "No"
     row["Distance"] = f"{float(result['distance']):.6f}"
     row["Threshold"] = f"{float(result['threshold']):.6f}"

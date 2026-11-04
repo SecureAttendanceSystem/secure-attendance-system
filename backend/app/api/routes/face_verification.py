@@ -1,52 +1,17 @@
-import cv2
-import numpy as np
-from deepface import DeepFace
-from fastapi import APIRouter, HTTPException, Request, UploadFile
 from uuid import UUID
-from fastapi import File, Form
+
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.student_face_embedding import StudentFaceEmbedding
+from app.services.face_embedding import (
+    MODEL,
+    compare_face_embeddings,
+    extract_face_embedding,
+)
 
 router = APIRouter(prefix="/face-spike", tags=["Face spike"])
-
-MODEL = "Facenet512"
-MAX_BYTES = 5 * 1024 * 1024  # 5 MB per photo
-
-
-def get_embedding(photo: UploadFile) -> list[float]:
-    data = photo.file.read(MAX_BYTES + 1)
-
-    if len(data) > MAX_BYTES:
-        raise HTTPException(413, "Photo must be smaller than 5 MB.")
-
-    if not data:
-        raise HTTPException(422, "The uploaded photo is empty.")
-
-    image = cv2.imdecode(
-        np.frombuffer(data, dtype=np.uint8),
-        cv2.IMREAD_COLOR,
-    )
-
-    if image is None:
-        raise HTTPException(422, "Could not read the photo.")
-
-    try:
-        faces = DeepFace.represent(
-            img_path=image,
-            model_name=MODEL,
-            enforce_detection=True,
-        )
-    except ValueError:
-        raise HTTPException(
-            422, "Could not process the face. Try a clearer photo."
-        ) from None
-
-    if len(faces) != 1:
-        raise HTTPException(422, "The photo must contain exactly one face.")
-
-    return faces[0]["embedding"]
 
 
 @router.post("/compare")
@@ -59,20 +24,10 @@ def compare_faces(
     if request.app.state.settings.environment != "development":
         raise HTTPException(404, "Not found")
 
-    result = DeepFace.verify(
-        img1_path=get_embedding(reference),
-        img2_path=get_embedding(selfie),
-        model_name=MODEL,
-        distance_metric="cosine",
-        silent=True,
-        anti_spoofing=True
+    return compare_face_embeddings(
+        extract_face_embedding(reference),
+        extract_face_embedding(selfie),
     )
-
-    return {
-        "matched": bool(result["verified"]),
-        "distance": float(result["distance"]),
-        "threshold": float(result["threshold"]),
-    }
 
 
 @router.post("/enroll-test", status_code=201)
@@ -102,18 +57,20 @@ def enroll_test(
         if role != "student":
             raise HTTPException(403, "User is not a student")
 
-        if session.get(StudentFaceEmbedding, student_id):
-            raise HTTPException(409, "Face already enrolled")
+        saved = session.get(StudentFaceEmbedding, student_id)
+        embedding = extract_face_embedding(reference)
 
-        embedding = get_embedding(reference)
-
-        session.add(
-            StudentFaceEmbedding(
-                student_id=student_id,
-                embedding=embedding,
-                model_name=MODEL,
+        if saved is not None:
+            saved.embedding = embedding
+            saved.model_name = MODEL
+        else:
+            session.add(
+                StudentFaceEmbedding(
+                    student_id=student_id,
+                    embedding=embedding,
+                    model_name=MODEL,
+                )
             )
-        )
 
         session.commit()
 
@@ -154,21 +111,6 @@ def verify_test(
 
         reference_embedding = saved.embedding
 
-    # Generate embedding from new selfie
-    selfie_embedding = get_embedding(selfie)
+    selfie_embedding = extract_face_embedding(selfie)
 
-    # Compare against stored embedding
-    result = DeepFace.verify(
-        img1_path=reference_embedding,
-        img2_path=selfie_embedding,
-        model_name=MODEL,
-        distance_metric="cosine",
-        silent=True,
-        anti_spoofing=True
-    )
-
-    return {
-        "matched": bool(result["verified"]),
-        "distance": float(result["distance"]),
-        "threshold": float(result["threshold"]),
-    }
+    return compare_face_embeddings(reference_embedding, selfie_embedding)

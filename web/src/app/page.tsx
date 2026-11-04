@@ -3,16 +3,18 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import styles from "./page.module.css";
 
-// This type keeps locally created demo accounts aligned with the available sign-up roles.
-type Role = "student" | "professor";
+// Signup is a local preview; actual accounts are provisioned by an admin.
+type Role = "student" | "professor" | "admin";
 type AuthMode = "login" | "signup";
-type Account = { email: string; password: string; role: Role };
 
-// These sample credentials make it possible to preview both account roles without a backend.
-const demoAccounts: Account[] = [
-  { email: "student@unb.ca", password: "Student123!", role: "student" },
-  { email: "professor@unb.ca", password: "Professor123!", role: "professor" },
-];
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:18000").replace(/\/$/, "");
+
+function apiError(data: unknown, fallback: string): string {
+  if (data && typeof data === "object" && "detail" in data && typeof data.detail === "string") {
+    return data.detail;
+  }
+  return fallback;
+}
 
 // This component contains only the sign-in and sign-up screens; authenticated pages are out of scope.
 export default function Home() {
@@ -22,15 +24,40 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [accounts, setAccounts] = useState<Account[]>(demoAccounts);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [signedInRole, setSignedInRole] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [facePreview, setFacePreview] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState("");
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cameraRequest = useRef(0);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+
+  // Face scan after login: compares a fresh selfie against the signed-in
+  // user's own enrolled face (POST /face/verify), not a manually typed ID.
+  const [faceScanStream, setFaceScanStream] = useState<MediaStream | null>(null);
+  const [faceScanPhoto, setFaceScanPhoto] = useState<string | null>(null);
+  const [faceScanResult, setFaceScanResult] = useState<{ matched: boolean; distance: number } | null>(null);
+  const [faceScanBusy, setFaceScanBusy] = useState(false);
+  const [faceScanError, setFaceScanError] = useState("");
+  const faceScanVideoRef = useRef<HTMLVideoElement>(null);
+  const faceScanCanvasRef = useRef<HTMLCanvasElement>(null);
+  const faceScanCameraRequest = useRef(0);
+  const faceScanStreamRef = useRef<MediaStream | null>(null);
+  const faceScanRequest = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    cameraRequest.current += 1;
+    faceScanCameraRequest.current += 1;
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    faceScanStreamRef.current?.getTracks().forEach((track) => track.stop());
+    faceScanRequest.current?.abort();
+  }, []);
 
   // This effect shows the requested camera stream and releases it when the preview closes.
   useEffect(() => {
@@ -45,8 +72,21 @@ export default function Home() {
     return () => cameraStream?.getTracks().forEach((track) => track.stop());
   }, [cameraStream]);
 
-  // This handler validates demo credentials and keeps all form actions on the login screen.
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    const video = faceScanVideoRef.current;
+    if (video && faceScanStream) {
+      video.srcObject = faceScanStream;
+      void video.play().catch(() => {
+        setFaceScanError("The camera preview could not start. Check your browser permissions.");
+      });
+    }
+
+    return () => faceScanStream?.getTracks().forEach((track) => track.stop());
+  }, [faceScanStream]);
+
+  // Login calls the real backend. Sign-up is still a local-only preview,
+  // since account creation is admin-only on the backend for now.
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
@@ -60,36 +100,53 @@ export default function Home() {
         setError("Please confirm that you understand how this demo handles your face preview.");
         return;
       }
-      if (accounts.some((account) => account.email === email.trim().toLowerCase())) {
-        setError("An account with this email already exists in the demo. Log in instead.");
-        return;
-      }
-
-      setAccounts((current) => [
-        ...current,
-        { email: email.trim().toLowerCase(), password, role },
-      ]);
       setEmail(email.trim().toLowerCase());
       setPassword("");
       setFullName("");
       setFacePreview(null);
       setPrivacyConsent(false);
       changeMode("login");
-      setMessage("Demo account created. Sign in with your email and password to continue.");
+      setMessage("Preview complete. No account or face enrollment was saved. Ask an administrator to create your account before signing in.");
       return;
     }
 
-    const account = accounts.find(
-      (item) =>
-        item.email === email.trim().toLowerCase() &&
-        item.password === password,
-    );
-    if (!account) {
-      setError("Those demo credentials do not match. Try one of the sample accounts below.");
-      return;
-    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      });
+      const data = await response.json();
 
-    setMessage(`Demo sign-in successful for the ${account.role} account. Dashboards are not included yet.`);
+      if (!response.ok) {
+        setError(apiError(data, "Could not sign in. Check your email and password."));
+        return;
+      }
+
+      setAccessToken(data.access_token);
+      setSignedInRole(data.user.role);
+      setPassword("");
+      setMessage(`Signed in as ${data.user.full_name} (${data.user.role}). Face scan is next.`);
+    } catch {
+      setError("Could not reach the server. Is the backend running?");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleSignOut() {
+    faceScanRequest.current?.abort();
+    faceScanRequest.current = null;
+    setFaceScanBusy(false);
+    setAccessToken(null);
+    setSignedInRole(null);
+    setMessage("");
+    setError("");
+    stopFaceScanCamera();
+    setFaceScanPhoto(null);
+    setFaceScanResult(null);
+    setFaceScanError("");
   }
 
   // This helper switches between the two forms and clears status from the previous form.
@@ -105,6 +162,8 @@ export default function Home() {
 
   // This function requests camera access only after the user starts face registration.
   async function startCamera() {
+    stopCamera();
+    const requestId = cameraRequest.current;
     setCameraError("");
     setError("");
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -117,9 +176,15 @@ export default function Home() {
         audio: false,
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
       });
+      if (requestId !== cameraRequest.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      cameraStreamRef.current = stream;
       setCameraStream(stream);
       setFacePreview(null);
     } catch (cameraRequestError) {
+      if (requestId !== cameraRequest.current) return;
       const permissionDenied =
         cameraRequestError instanceof DOMException &&
         cameraRequestError.name === "NotAllowedError";
@@ -156,8 +221,110 @@ export default function Home() {
 
   // This helper releases the camera when the preview is captured or the user changes forms.
   function stopCamera() {
-    cameraStream?.getTracks().forEach((track) => track.stop());
+    cameraRequest.current += 1;
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
     setCameraStream(null);
+  }
+
+  async function startFaceScan() {
+    stopFaceScanCamera();
+    const requestId = faceScanCameraRequest.current;
+    setFaceScanError("");
+    setFaceScanResult(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setFaceScanError("Camera access requires a supported browser on localhost or HTTPS.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      if (requestId !== faceScanCameraRequest.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      faceScanStreamRef.current = stream;
+      setFaceScanStream(stream);
+      setFaceScanPhoto(null);
+    } catch {
+      if (requestId !== faceScanCameraRequest.current) return;
+      setFaceScanError("Could not open the camera. Allow access and check that no other app is using it.");
+    }
+  }
+
+  function stopFaceScanCamera() {
+    faceScanCameraRequest.current += 1;
+    faceScanStreamRef.current?.getTracks().forEach((track) => track.stop());
+    faceScanStreamRef.current = null;
+    setFaceScanStream(null);
+  }
+
+  function captureFaceScan() {
+    const video = faceScanVideoRef.current;
+    const canvas = faceScanCanvasRef.current;
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      setFaceScanError("Wait for the camera preview to load before capturing.");
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setFaceScanError("Could not capture a photo in this browser.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setFaceScanPhoto(canvas.toDataURL("image/jpeg", 0.9));
+    setFaceScanError("");
+    stopFaceScanCamera();
+  }
+
+  async function submitFaceScan() {
+    if (!faceScanPhoto || !accessToken || faceScanRequest.current) return;
+    const controller = new AbortController();
+    faceScanRequest.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 120_000);
+    setFaceScanBusy(true);
+    setFaceScanError("");
+    try {
+      const selfieBlob = await (await fetch(faceScanPhoto)).blob();
+      const body = new FormData();
+      body.append("selfie", selfieBlob, "selfie.jpg");
+
+      const response = await fetch(`${API_BASE_URL}/face/verify`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body,
+        signal: controller.signal,
+      });
+      const data = await response.json();
+      if (faceScanRequest.current !== controller) return;
+
+      if (!response.ok) {
+        setFaceScanError(apiError(data, "Could not verify your face. Try again."));
+        return;
+      }
+
+      if (typeof data?.matched !== "boolean" || typeof data?.distance !== "number" || !Number.isFinite(data.distance)) {
+        setFaceScanError("The server returned an unexpected face verification response.");
+        return;
+      }
+      setFaceScanResult({ matched: data.matched, distance: data.distance });
+    } catch {
+      if (faceScanRequest.current === controller) {
+        setFaceScanError(controller.signal.aborted
+          ? "Face verification timed out. Please try again."
+          : "Could not reach the server. Is the backend running?");
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (faceScanRequest.current === controller) {
+        faceScanRequest.current = null;
+        setFaceScanBusy(false);
+      }
+    }
   }
 
   return (
@@ -175,159 +342,249 @@ export default function Home() {
         <div className={styles.cardHeading}>
           <p className={styles.eyebrow}>SECURE ATTENDANCE</p>
           <h1 id="form-heading">
-            {mode === "login" ? "Welcome back" : "Create your account"}
+            {accessToken ? "You're signed in" : mode === "login" ? "Welcome back" : "Create your account"}
           </h1>
           <p>
-            {mode === "login"
-              ? "Sign in to your university account."
-              : "A few details to get you started."}
+            {accessToken
+              ? "The face scan step comes next."
+              : mode === "login"
+                ? "Sign in to your university account."
+                : "Preview registration locally. An administrator must create your actual account."}
           </p>
         </div>
 
-        <div aria-label="Account access" className={styles.tabs} role="tablist">
-          <button
-            aria-selected={mode === "login"}
-            className={mode === "login" ? styles.selectedTab : ""}
-            onClick={() => changeMode("login")}
-            role="tab"
-            type="button"
-          >
-            Log in
-          </button>
-          <button
-            aria-selected={mode === "signup"}
-            className={mode === "signup" ? styles.selectedTab : ""}
-            onClick={() => changeMode("signup")}
-            role="tab"
-            type="button"
-          >
-            Sign up
-          </button>
-        </div>
+        {accessToken ? (
+          <div className={styles.form}>
+            {message && <p className={styles.message} role="status">{message}</p>}
 
-        <form className={styles.form} onSubmit={handleSubmit}>
-          {mode === "signup" && (
-            <>
-              <label htmlFor="full-name">Full name</label>
+            {signedInRole === "student" ? (
+              <div className={styles.faceSection}>
+                <div className={styles.faceHeading}>
+                  <span>
+                    <strong>Face scan</strong>
+                    <small>Verify it&apos;s really you</small>
+                  </span>
+                </div>
+                <canvas aria-hidden="true" className={styles.hiddenCanvas} ref={faceScanCanvasRef} />
+                {faceScanResult ? (
+                  <p
+                    className={faceScanResult.matched ? styles.message : styles.error}
+                    role="status"
+                  >
+                    {faceScanResult.matched ? "Face matched." : "Face did not match."}{" "}
+                    (distance {faceScanResult.distance.toFixed(4)})
+                  </p>
+                ) : faceScanPhoto ? (
+                  <div className={styles.facePreviewRow}>
+                    <div
+                      aria-label="Captured face scan"
+                      className={styles.facePreview}
+                      role="img"
+                      style={{ backgroundImage: `url("${faceScanPhoto}")` }}
+                    />
+                    <span><strong>Photo captured</strong><small>Ready to verify</small></span>
+                    <button className={styles.retakeButton} disabled={faceScanBusy} onClick={startFaceScan} type="button">
+                      Retake
+                    </button>
+                  </div>
+                ) : (
+                  <div className={styles.cameraPreview} style={{ height: "auto", aspectRatio: "4 / 3" }}>
+                    {faceScanStream ? (
+                      <video autoPlay muted playsInline ref={faceScanVideoRef} style={{ objectFit: "contain" }} />
+                    ) : (
+                      <span>Camera preview will appear here</span>
+                    )}
+                  </div>
+                )}
+                {faceScanError && <p className={styles.error} role="alert">{faceScanError}</p>}
+                {faceScanResult && (
+                  <button className={styles.cameraButton} onClick={startFaceScan} type="button">
+                    Scan again
+                  </button>
+                )}
+                {!faceScanPhoto && (
+                  <button
+                    className={styles.cameraButton}
+                    onClick={faceScanStream ? captureFaceScan : startFaceScan}
+                    type="button"
+                  >
+                    {faceScanStream ? "Capture photo" : "Start face scan"}
+                  </button>
+                )}
+                {faceScanPhoto && !faceScanResult && (
+                  <button
+                    className={styles.submitButton}
+                    disabled={faceScanBusy}
+                    onClick={() => void submitFaceScan()}
+                    type="button"
+                  >
+                    {faceScanBusy ? "Verifying…" : "Verify my face"}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p>Face scan applies to student accounts.</p>
+            )}
+
+            <button className={styles.submitButton} onClick={handleSignOut} type="button">
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <>
+            <div aria-label="Account access" className={styles.tabs} role="tablist">
+              <button
+                aria-selected={mode === "login"}
+                className={mode === "login" ? styles.selectedTab : ""}
+                onClick={() => changeMode("login")}
+                disabled={isSubmitting}
+                role="tab"
+                type="button"
+              >
+                Log in
+              </button>
+              <button
+                aria-selected={mode === "signup"}
+                className={mode === "signup" ? styles.selectedTab : ""}
+                onClick={() => changeMode("signup")}
+                disabled={isSubmitting}
+                role="tab"
+                type="button"
+              >
+                Sign up
+              </button>
+            </div>
+
+            <form className={styles.form} onSubmit={handleSubmit}>
+              {mode === "signup" && (
+                <>
+                  <label htmlFor="full-name">Full name</label>
+                  <input
+                    autoComplete="name"
+                    id="full-name"
+                    onChange={(event) => setFullName(event.target.value)}
+                    placeholder="Your name"
+                    required
+                    value={fullName}
+                  />
+
+                  <label>Account type</label>
+                  <div aria-label="Account type" className={styles.roleButtons}>
+                    <button
+                      aria-pressed={role === "student"}
+                      className={role === "student" ? styles.selectedRole : ""}
+                      onClick={() => setRole("student")}
+                      type="button"
+                    >
+                      Student
+                    </button>
+                    <button
+                      aria-pressed={role === "professor"}
+                      className={role === "professor" ? styles.selectedRole : ""}
+                      onClick={() => setRole("professor")}
+                      type="button"
+                    >
+                      Professor
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <label htmlFor="email">University email</label>
               <input
-                autoComplete="name"
-                id="full-name"
-                onChange={(event) => setFullName(event.target.value)}
-                placeholder="Your name"
+                autoComplete="username"
+                id="email"
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@unb.ca"
                 required
-                value={fullName}
+                type="email"
+                value={email}
               />
 
-              <label>Account type</label>
-              <div aria-label="Account type" className={styles.roleButtons}>
-                <button
-                  aria-pressed={role === "student"}
-                  className={role === "student" ? styles.selectedRole : ""}
-                  onClick={() => setRole("student")}
-                  type="button"
-                >
-                  Student
-                </button>
-                <button
-                  aria-pressed={role === "professor"}
-                  className={role === "professor" ? styles.selectedRole : ""}
-                  onClick={() => setRole("professor")}
-                  type="button"
-                >
-                  Professor
-                </button>
-              </div>
-            </>
-          )}
+              <label htmlFor="password">Password</label>
+              <input
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                id="password"
+                minLength={8}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={mode === "login" ? "Enter your password" : "At least 8 characters"}
+                required
+                type="password"
+                value={password}
+              />
 
-          <label htmlFor="email">University email</label>
-          <input
-            autoComplete="username"
-            id="email"
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@unb.ca"
-            required
-            type="email"
-            value={email}
-          />
-
-          <label htmlFor="password">Password</label>
-          <input
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            id="password"
-            minLength={8}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder={mode === "login" ? "Enter your password" : "At least 8 characters"}
-            required
-            type="password"
-            value={password}
-          />
-
-          {mode === "signup" && (
-            <div className={styles.faceSection}>
-              <div className={styles.faceHeading}>
-                <span>
-                  <strong>Face registration</strong>
-                  <small>Register one face with your account</small>
-                </span>
-                <span className={styles.required}>REQUIRED</span>
-              </div>
-              <canvas aria-hidden="true" className={styles.hiddenCanvas} ref={canvasRef} />
-              {facePreview ? (
-                <div className={styles.facePreviewRow}>
-                  {/* This temporary image stays in memory only and is cleared when the form is reset. */}
-                  <div
-                    aria-label="Temporary face-registration preview"
-                    className={styles.facePreview}
-                    role="img"
-                    style={{ backgroundImage: `url("${facePreview}")` }}
-                  />
-                  <span><strong>Preview captured</strong><small>Not uploaded or saved</small></span>
-                  <button className={styles.retakeButton} onClick={startCamera} type="button">
-                    Retake
-                  </button>
-                </div>
-              ) : (
-                <div className={styles.cameraPreview}>
-                  {cameraStream ? (
-                    <video autoPlay muted playsInline ref={videoRef} />
+              {mode === "signup" && (
+                <div className={styles.faceSection}>
+                  <div className={styles.faceHeading}>
+                    <span>
+                      <strong>Face registration</strong>
+                      <small>Register one face with your account</small>
+                    </span>
+                    <span className={styles.required}>REQUIRED</span>
+                  </div>
+                  <canvas aria-hidden="true" className={styles.hiddenCanvas} ref={canvasRef} />
+                  {facePreview ? (
+                    <div className={styles.facePreviewRow}>
+                      {/* This temporary image stays in memory only and is cleared when the form is reset. */}
+                      <div
+                        aria-label="Temporary face-registration preview"
+                        className={styles.facePreview}
+                        role="img"
+                        style={{ backgroundImage: `url("${facePreview}")` }}
+                      />
+                      <span><strong>Preview captured</strong><small>Not uploaded or saved</small></span>
+                      <button className={styles.retakeButton} onClick={startCamera} type="button">
+                        Retake
+                      </button>
+                    </div>
                   ) : (
-                    <span>Camera preview will appear here</span>
+                    <div className={styles.cameraPreview}>
+                      {cameraStream ? (
+                        <video autoPlay muted playsInline ref={videoRef} />
+                      ) : (
+                        <span>Camera preview will appear here</span>
+                      )}
+                    </div>
                   )}
+                  {cameraError && <p className={styles.error} role="alert">{cameraError}</p>}
+                  {!facePreview && (
+                    <button
+                      className={styles.cameraButton}
+                      onClick={cameraStream ? captureFacePreview : startCamera}
+                      type="button"
+                    >
+                      {cameraStream ? "Capture face preview" : "Start face registration"}
+                    </button>
+                  )}
+                  <label className={styles.consent}>
+                    <input
+                      checked={privacyConsent}
+                      onChange={(event) => setPrivacyConsent(event.target.checked)}
+                      type="checkbox"
+                    />
+                    I understand this is a local camera preview.
+                  </label>
                 </div>
               )}
-              {cameraError && <p className={styles.error} role="alert">{cameraError}</p>}
-              {!facePreview && (
-                <button
-                  className={styles.cameraButton}
-                  onClick={cameraStream ? captureFacePreview : startCamera}
-                  type="button"
-                >
-                  {cameraStream ? "Capture face preview" : "Start face registration"}
-                </button>
-              )}
-              <label className={styles.consent}>
-                <input
-                  checked={privacyConsent}
-                  onChange={(event) => setPrivacyConsent(event.target.checked)}
-                  type="checkbox"
-                />
-                I understand this is a local camera preview.
-              </label>
-            </div>
-          )}
 
-          {error && <p className={styles.error} role="alert">{error}</p>}
-          {message && <p className={styles.message} role="status">{message}</p>}
+              {error && <p className={styles.error} role="alert">{error}</p>}
+              {message && <p className={styles.message} role="status">{message}</p>}
 
-          <button className={styles.submitButton} type="submit">
-            {mode === "login" ? "Log in" : "Create account"}
-          </button>
-        </form>
-        <button type="button" className={styles.cameraButton} style={{ marginTop: 16 }}
-          onClick={() => { stopCamera(); setComparisonOpen(true); }}>
-          Test face verification
-        </button>
+              <button className={styles.submitButton} disabled={isSubmitting} type="submit">
+                {mode === "login" ? (isSubmitting ? "Signing in…" : "Log in") : "Complete registration preview"}
+              </button>
+            </form>
+            <button
+              type="button"
+              className={styles.cameraButton}
+              disabled={isSubmitting}
+              style={{ marginTop: 16 }}
+              onClick={() => { stopCamera(); setComparisonOpen(true); }}
+            >
+              Test face verification
+            </button>
+          </>
+        )}
       </section>
       )}
     </main>
@@ -336,14 +593,14 @@ export default function Home() {
 
 type CaptureTarget = "reference" | "selfie";
 type FaceResult = { matched: boolean; distance: number; threshold: number };
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:18000").replace(/\/$/, "");
+const API_URL = API_BASE_URL;
 
 function photoBlob(dataUrl: string): Blob {
   const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (char) => char.charCodeAt(0));
   return new Blob([bytes], { type: "image/jpeg" });
 }
 
-// This panel calls the real backend; login and signup remain local demos.
+// Development-only tools for enrollment and face comparison.
 function FaceComparison({ onBack }: { onBack: () => void }) {
   const [operation, setOperation] = useState<"verify" | "enroll" | "compare">("verify");
   const [studentId, setStudentId] = useState("");
@@ -530,7 +787,7 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
         <p className={styles.eyebrow}>FACE VERIFICATION TEST</p>
         <h1 id="face-test-heading">{operation === "enroll" ? "Enroll a face" : operation === "verify" ? "Verify saved face" : "Compare two photos"}</h1>
         <p>{operation === "enroll"
-          ? "Save a reference face once for an existing test student."
+          ? "Save or replace the reference face for an existing test student."
           : operation === "verify"
           ? "Compare a new selfie with the reference face saved in the database."
           : "Compare two new photos without saving an enrollment."}</p>
@@ -542,7 +799,7 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
           style={{ minHeight: 40, padding: 8, border: "1px solid #e2e7ef", borderRadius: 7, background: "#fff", color: "#263348", width: "100%" }}
           onChange={(event) => changeOperation(event.target.value as "verify" | "enroll" | "compare")}>
           <option value="verify">Verify saved face</option>
-          <option value="enroll">Enroll a face once</option>
+          <option value="enroll">Enroll or replace a face</option>
           <option value="compare">Compare two photos</option>
         </select>
         {operation !== "compare" && <>
@@ -567,7 +824,7 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
           <input type="checkbox" checked={consent} disabled={busy || opening || !!stream}
             onChange={(event) => setConsent(event.target.checked)} />
           {operation === "enroll"
-            ? "I agree to send this photo to the backend and save its face embedding in the database for this test student. The endpoint does not save the photo itself."
+            ? "I agree to send this photo to the backend and save its face embedding, replacing any existing face for this test student. The endpoint does not save the photo itself."
             : "I agree to send the captured photo(s) to the backend for this test. This action does not save a new face enrollment."}
         </label>
         {neededPhotos.map((photoTarget) => (

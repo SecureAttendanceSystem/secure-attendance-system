@@ -30,6 +30,12 @@ def test_verify_password_rejects_when_no_hash_exists():
     assert verify_password("anything", None) is False
 
 
+def test_dummy_password_never_authenticates_a_missing_hash():
+    # This is the input used to generate the timing-only dummy hash.
+    assert verify_password("werkzeug.security", None) is False
+    assert verify_password("werkzeug.security", "") is False
+
+
 def test_verify_password_rejects_a_hash_in_an_unrecognized_scheme():
     # e.g. a bcrypt hash ("$2a$06$...") seeded by something other than
     # generate_password_hash; check_password_hash can't parse it and raises
