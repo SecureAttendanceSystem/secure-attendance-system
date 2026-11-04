@@ -11,6 +11,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000"]}'
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic

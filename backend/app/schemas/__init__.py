@@ -1,1 +1,1 @@
-"""Request and response models for future application endpoints."""
+"""Request and response models for application endpoints."""
