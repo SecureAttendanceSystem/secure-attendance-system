@@ -46,6 +46,9 @@ jobs:
     name: Backend tests and migrations
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # CI-only signing key for ephemeral containers; never used for real tokens.
+      JWT_SECRET_KEY: ci-only-insecure-jwt-secret-do-not-reuse-0000000000
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start backend and database
