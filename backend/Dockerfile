@@ -26,4 +26,6 @@ USER root
 COPY requirements-dev.txt ./requirements-dev.txt
 RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY --chown=appuser:appuser tests ./tests
+COPY --chown=appuser:appuser evaluation/evaluate_face_verification.py ./evaluation/evaluate_face_verification.py
+RUN mkdir -p .pytest_cache && chown appuser:appuser .pytest_cache
 USER appuser
