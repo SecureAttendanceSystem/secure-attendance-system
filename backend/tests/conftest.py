@@ -12,6 +12,7 @@ def isolated_environment(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
     monkeypatch.setenv("ENVIRONMENT", "test")
     monkeypatch.setenv("LOG_LEVEL", "INFO")
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-not-for-production-use-only")
     monkeypatch.delenv("APP_NAME", raising=False)
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
     get_settings.cache_clear()

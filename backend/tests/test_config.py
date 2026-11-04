@@ -55,3 +55,15 @@ def test_settings_require_explicit_browser_origins(origins):
 
 def test_empty_origin_list_disables_browser_access():
     assert Settings(cors_origins=[]).cors_origins == []
+
+
+def test_jwt_secret_key_is_required(monkeypatch):
+    monkeypatch.delenv("JWT_SECRET_KEY")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_jwt_secret_key_must_be_long_enough(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "too-short")
+    with pytest.raises(ValidationError):
+        Settings()

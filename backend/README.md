@@ -59,9 +59,9 @@ app/api/          APIRouter and endpoint modules
 app/core/         Settings, exception handlers, and logging
 app/database/     SQLAlchemy engine and model base
 app/models/       Database models
-app/schemas/      Reserved request and response models
+app/schemas/      Request and response models
 app/services/     Reserved application operations
-app/security/     Reserved authentication helpers
+app/security/     Password hashing and JWT helpers
 alembic/          Migration configuration and revisions
 tests/            Backend foundation tests
 ```
