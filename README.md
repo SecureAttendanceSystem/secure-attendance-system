@@ -45,6 +45,7 @@ Leave `DATABASE_URL` commented out to use your own local PostgreSQL database.
 | `ENVIRONMENT` | `development`; also accepts `test` or `production` |
 | `LOG_LEVEL` | `INFO`; also accepts `DEBUG`, `WARNING`, `ERROR`, `CRITICAL` |
 | `CORS_ORIGINS` | JSON array of approved browser origins; defaults to localhost and 127.0.0.1 on port 3000 |
+| `JWT_SECRET_KEY` | Required, no default; secret used to sign login access tokens. Generate your own value and never commit it |
 
 To use Supabase, put its PostgreSQL **session-pooler** URL in the root `.env`, using
 this format with your own connection parameters:
