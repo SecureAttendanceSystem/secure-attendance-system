@@ -345,6 +345,9 @@ function photoBlob(dataUrl: string): Blob {
 
 // This panel calls the real backend; login and signup remain local demos.
 function FaceComparison({ onBack }: { onBack: () => void }) {
+  const [operation, setOperation] = useState<"verify" | "enroll" | "compare">("verify");
+  const [studentId, setStudentId] = useState("");
+  const [enrollmentMessage, setEnrollmentMessage] = useState("");
   const [photos, setPhotos] = useState<Record<CaptureTarget, string | null>>({ reference: null, selfie: null });
   const [target, setTarget] = useState<CaptureTarget>("reference");
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -384,6 +387,7 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
     stopCamera();
     setError("");
     setResult(null);
+    setEnrollmentMessage("");
     setTarget(nextTarget);
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("Camera access requires localhost or HTTPS and a supported browser.");
@@ -429,29 +433,52 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
     setPhotos((current) => ({ ...current, [target]: canvas.toDataURL("image/jpeg", 0.9) }));
     setError("");
     setResult(null);
+    setEnrollmentMessage("");
     stopCamera();
   }
 
-  async function comparePhotos() {
-    if (!photos.reference || !photos.selfie || !consent || busy) return;
+  const validStudentId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studentId.trim());
+  const neededPhotos: CaptureTarget[] = operation === "compare" ? ["reference", "selfie"] : [operation === "enroll" ? "reference" : "selfie"];
+  const cannotSubmit = busy || !consent || neededPhotos.some((key) => !photos[key]) ||
+    !!stream || opening || (operation !== "compare" && !validStudentId);
+  const submitLabel = operation === "enroll" ? "Enroll face" : operation === "verify" ? "Verify saved face" : "Compare faces";
+
+  function changeOperation(next: "verify" | "enroll" | "compare") {
+    stopCamera();
+    setOperation(next);
+    setConsent(false);
+    setPhotos({ reference: null, selfie: null });
+    setResult(null);
+    setEnrollmentMessage("");
+    setError("");
+  }
+
+  async function submitPhotos() {
+    if (cannotSubmit) return;
     stopCamera();
     setBusy(true);
     setError("");
     setResult(null);
+    setEnrollmentMessage("");
     const controller = new AbortController();
     requestRef.current = controller;
     const timeout = setTimeout(() => controller.abort(), 120000);
     try {
       const body = new FormData();
-      body.append("reference", photoBlob(photos.reference), "reference.jpg");
-      body.append("selfie", photoBlob(photos.selfie), "selfie.jpg");
+      if (operation !== "compare") body.append("student_id", studentId.trim());
+      for (const key of neededPhotos) {
+        const photo = photos[key];
+        if (!photo) throw new Error("Capture the required photo first.");
+        body.append(key, photoBlob(photo), key + ".jpg");
+      }
+      const endpoint = operation === "enroll" ? "/enroll-test" : operation === "verify" ? "/verify-test" : "/compare";
       // The browser sets Content-Type, including the multipart boundary.
-      const response = await fetch(API_URL + "/face-spike/compare", {
+      const response = await fetch(API_URL + "/face-spike" + endpoint, {
         method: "POST", body, signal: controller.signal,
       });
       const data: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        let detail = "Comparison failed (HTTP " + response.status + "). Check the backend logs.";
+        let detail = "Face request failed (HTTP " + response.status + "). Check the backend logs.";
         if (data && typeof data === "object" && "detail" in data) {
           if (typeof data.detail === "string") detail = data.detail;
           else if (Array.isArray(data.detail)) {
@@ -460,7 +487,20 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
             ).join(" ");
           }
         }
+        if (response.status === 409 && operation === "enroll") {
+          detail = "This student already has an enrolled face. Choose Verify saved face to use it.";
+        }
         throw new Error(detail);
+      }
+      if (operation === "enroll") {
+        if (!data || typeof data !== "object" || !("enrolled" in data) || data.enrolled !== true ||
+            !("student_id" in data) || typeof data.student_id !== "string" ||
+            data.student_id.toLowerCase() !== studentId.trim().toLowerCase()) {
+          throw new Error("The backend returned an unexpected enrollment response.");
+        }
+        setEnrollmentMessage("Face enrolled. Its numerical embedding is saved for this student. Switch to Verify saved face to test a new selfie.");
+        setPhotos({ reference: null, selfie: null });
+        return;
       }
       if (!data || typeof data !== "object" || !("matched" in data) ||
           typeof data.matched !== "boolean" || !("distance" in data) ||
@@ -475,7 +515,7 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
       } else if (requestError instanceof TypeError) {
         setError("Could not reach the face API. Check Docker, the API address, and CORS permission for http://localhost:3000.");
       } else {
-        setError(requestError instanceof Error ? requestError.message : "Face comparison failed.");
+        setError(requestError instanceof Error ? requestError.message : "Face request failed.");
       }
     } finally {
       clearTimeout(timeout);
@@ -484,27 +524,59 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
     }
   }
 
-  const cannotCompare = busy || !consent || !photos.reference || !photos.selfie || !!stream || opening;
   return (
     <section aria-labelledby="face-test-heading" className={styles.authCard}>
       <div className={styles.cardHeading}>
         <p className={styles.eyebrow}>FACE VERIFICATION TEST</p>
-        <h1 id="face-test-heading">Compare two photos</h1>
-        <p>Capture a reference and a new selfie. Keep your face visible and evenly lit; you can keep your head covering on.</p>
+        <h1 id="face-test-heading">{operation === "enroll" ? "Enroll a face" : operation === "verify" ? "Verify saved face" : "Compare two photos"}</h1>
+        <p>{operation === "enroll"
+          ? "Save a reference face once for an existing test student."
+          : operation === "verify"
+          ? "Compare a new selfie with the reference face saved in the database."
+          : "Compare two new photos without saving an enrollment."}</p>
+        <p>Keep your face visible and evenly lit. You can keep your head covering on.</p>
+      </div>
+      <div className={styles.form}>
+        <label htmlFor="face-operation">Test action</label>
+        <select id="face-operation" value={operation} disabled={busy || opening || !!stream}
+          style={{ minHeight: 40, padding: 8, border: "1px solid #e2e7ef", borderRadius: 7, background: "#fff", color: "#263348", width: "100%" }}
+          onChange={(event) => changeOperation(event.target.value as "verify" | "enroll" | "compare")}>
+          <option value="verify">Verify saved face</option>
+          <option value="enroll">Enroll a face once</option>
+          <option value="compare">Compare two photos</option>
+        </select>
+        {operation !== "compare" && <>
+          <label htmlFor="face-student-id">Test student UUID</label>
+          <input id="face-student-id" value={studentId} placeholder="Paste the Student ID printed by the seed script"
+            autoComplete="off" spellCheck={false} disabled={busy || opening || !!stream}
+            aria-describedby="face-student-help"
+            onChange={(event) => {
+              setStudentId(event.target.value);
+              setResult(null);
+              setEnrollmentMessage("");
+              setError("");
+            }} />
+          <small id="face-student-help" style={{ marginTop: 6, color: "#748096", fontSize: 11 }}>
+            Use the existing database students UUID, not their university ID. This is a development test, not account login.
+          </small>
+          {studentId.trim() && !validStudentId && <p className={styles.error} role="alert">Enter a complete student UUID in the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.</p>}
+        </>}
       </div>
       <div className={styles.faceSection}>
         <label className={styles.consent}>
           <input type="checkbox" checked={consent} disabled={busy || opening || !!stream}
             onChange={(event) => setConsent(event.target.checked)} />
-          I agree to send these two photos to the configured backend for this comparison. This test does not enroll a face or create an account.
+          {operation === "enroll"
+            ? "I agree to send this photo to the backend and save its face embedding in the database for this test student. The endpoint does not save the photo itself."
+            : "I agree to send the captured photo(s) to the backend for this test. This action does not save a new face enrollment."}
         </label>
-        {(["reference", "selfie"] as const).map((photoTarget) => (
+        {neededPhotos.map((photoTarget) => (
           <div className={styles.facePreviewRow} key={photoTarget}>
             {photos[photoTarget] && <div className={styles.facePreview} role="img"
               aria-label={"Captured " + photoTarget + " photo"}
               style={{ backgroundImage: 'url("' + photos[photoTarget] + '")' }} />}
             <span>
-              <strong>{photoTarget === "reference" ? "1. Reference photo" : "2. New selfie"}</strong>
+              <strong>{photoTarget === "reference" ? "Reference photo" : "New selfie"}</strong>
               <small>{photos[photoTarget] ? "Captured" : "Not captured yet"}</small>
             </span>
             <button type="button" className={styles.retakeButton}
@@ -526,12 +598,13 @@ function FaceComparison({ onBack }: { onBack: () => void }) {
           <button type="button" className={styles.cameraButton} onClick={stopCamera}>Cancel camera</button>
         </>}
       </div>
-      <button type="button" className={styles.submitButton} style={{ width: "100%", opacity: cannotCompare ? 0.55 : 1 }}
-        disabled={cannotCompare} onClick={() => void comparePhotos()}>
-        {busy ? "Comparing…" : "Compare faces"}
+      <button type="button" className={styles.submitButton} style={{ width: "100%", opacity: cannotSubmit ? 0.55 : 1 }}
+        disabled={cannotSubmit} onClick={() => void submitPhotos()}>
+        {busy ? "Processing…" : submitLabel}
       </button>
       {busy && <p className={styles.message} role="status">Processing photos. The first comparison may take longer while the model loads.</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
+      {enrollmentMessage && <p className={styles.message} role="status">{enrollmentMessage}</p>}
       {result && <div className={result.matched ? styles.message : styles.error} role="status">
         <strong>{result.matched ? "Face matched" : "Face did not match"}</strong>
         <div>Distance: {result.distance.toFixed(6)} · Threshold: {result.threshold}</div>
