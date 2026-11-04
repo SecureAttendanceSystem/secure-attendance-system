@@ -16,6 +16,7 @@ const demoAccounts: Account[] = [
 
 // This component contains only the sign-in and sign-up screens; authenticated pages are out of scope.
 export default function Home() {
+  const [comparisonOpen, setComparisonOpen] = useState(false);
   const [mode, setMode] = useState<AuthMode>("login");
   const [role, setRole] = useState<Role>("student");
   const [email, setEmail] = useState("");
@@ -169,6 +170,7 @@ export default function Home() {
         <span className={styles.school}>UNIVERSITY OF NEW BRUNSWICK</span>
       </header>
 
+      {comparisonOpen ? <FaceComparison onBack={() => setComparisonOpen(false)} /> : (
       <section aria-labelledby="form-heading" className={styles.authCard}>
         <div className={styles.cardHeading}>
           <p className={styles.eyebrow}>SECURE ATTENDANCE</p>
@@ -322,8 +324,221 @@ export default function Home() {
             {mode === "login" ? "Log in" : "Create account"}
           </button>
         </form>
-
+        <button type="button" className={styles.cameraButton} style={{ marginTop: 16 }}
+          onClick={() => { stopCamera(); setComparisonOpen(true); }}>
+          Test face verification
+        </button>
       </section>
+      )}
     </main>
+  );
+}
+
+type CaptureTarget = "reference" | "selfie";
+type FaceResult = { matched: boolean; distance: number; threshold: number };
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:18000").replace(/\/$/, "");
+
+function photoBlob(dataUrl: string): Blob {
+  const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (char) => char.charCodeAt(0));
+  return new Blob([bytes], { type: "image/jpeg" });
+}
+
+// This panel calls the real backend; login and signup remain local demos.
+function FaceComparison({ onBack }: { onBack: () => void }) {
+  const [photos, setPhotos] = useState<Record<CaptureTarget, string | null>>({ reference: null, selfie: null });
+  const [target, setTarget] = useState<CaptureTarget>("reference");
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<FaceResult | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const cameraRequest = useRef(0);
+  const requestRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    cameraRequest.current += 1;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    requestRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      void videoRef.current.play().catch(() => setError("Camera preview could not start. Try again."));
+    }
+  }, [stream]);
+
+  function stopCamera() {
+    cameraRequest.current += 1;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setStream(null);
+    setOpening(false);
+  }
+
+  async function startCamera(nextTarget: CaptureTarget) {
+    stopCamera();
+    setError("");
+    setResult(null);
+    setTarget(nextTarget);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Camera access requires localhost or HTTPS and a supported browser.");
+      return;
+    }
+    const requestId = cameraRequest.current;
+    setOpening(true);
+    try {
+      const nextStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      if (requestId !== cameraRequest.current) {
+        nextStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current = nextStream;
+      setStream(nextStream);
+    } catch {
+      if (requestId === cameraRequest.current) {
+        setError("Could not open the camera. Allow camera access and check that another app is not using it.");
+      }
+    } finally {
+      if (requestId === cameraRequest.current) setOpening(false);
+    }
+  }
+
+  function capturePhoto() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !video.videoWidth || !video.videoHeight) {
+      setError("Wait until the camera preview is ready, then capture again.");
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setError("Could not capture a photo in this browser.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setPhotos((current) => ({ ...current, [target]: canvas.toDataURL("image/jpeg", 0.9) }));
+    setError("");
+    setResult(null);
+    stopCamera();
+  }
+
+  async function comparePhotos() {
+    if (!photos.reference || !photos.selfie || !consent || busy) return;
+    stopCamera();
+    setBusy(true);
+    setError("");
+    setResult(null);
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 120000);
+    try {
+      const body = new FormData();
+      body.append("reference", photoBlob(photos.reference), "reference.jpg");
+      body.append("selfie", photoBlob(photos.selfie), "selfie.jpg");
+      // The browser sets Content-Type, including the multipart boundary.
+      const response = await fetch(API_URL + "/face-spike/compare", {
+        method: "POST", body, signal: controller.signal,
+      });
+      const data: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        let detail = "Comparison failed (HTTP " + response.status + "). Check the backend logs.";
+        if (data && typeof data === "object" && "detail" in data) {
+          if (typeof data.detail === "string") detail = data.detail;
+          else if (Array.isArray(data.detail)) {
+            detail = data.detail.map((item: unknown) =>
+              item && typeof item === "object" && "msg" in item ? String(item.msg) : "Invalid photo upload."
+            ).join(" ");
+          }
+        }
+        throw new Error(detail);
+      }
+      if (!data || typeof data !== "object" || !("matched" in data) ||
+          typeof data.matched !== "boolean" || !("distance" in data) ||
+          typeof data.distance !== "number" || !Number.isFinite(data.distance) ||
+          !("threshold" in data) || typeof data.threshold !== "number" || !Number.isFinite(data.threshold)) {
+        throw new Error("The backend returned an unexpected comparison response.");
+      }
+      setResult({ matched: data.matched, distance: data.distance, threshold: data.threshold });
+    } catch (requestError) {
+      if (controller.signal.aborted) {
+        setError("The request timed out after two minutes. Check the backend logs; the model may still be downloading.");
+      } else if (requestError instanceof TypeError) {
+        setError("Could not reach the face API. Check Docker, the API address, and CORS permission for http://localhost:3000.");
+      } else {
+        setError(requestError instanceof Error ? requestError.message : "Face comparison failed.");
+      }
+    } finally {
+      clearTimeout(timeout);
+      requestRef.current = null;
+      setBusy(false);
+    }
+  }
+
+  const cannotCompare = busy || !consent || !photos.reference || !photos.selfie || !!stream || opening;
+  return (
+    <section aria-labelledby="face-test-heading" className={styles.authCard}>
+      <div className={styles.cardHeading}>
+        <p className={styles.eyebrow}>FACE VERIFICATION TEST</p>
+        <h1 id="face-test-heading">Compare two photos</h1>
+        <p>Capture a reference and a new selfie. Keep your face visible and evenly lit; you can keep your head covering on.</p>
+      </div>
+      <div className={styles.faceSection}>
+        <label className={styles.consent}>
+          <input type="checkbox" checked={consent} disabled={busy || opening || !!stream}
+            onChange={(event) => setConsent(event.target.checked)} />
+          I agree to send these two photos to the configured backend for this comparison. This test does not enroll a face or create an account.
+        </label>
+        {(["reference", "selfie"] as const).map((photoTarget) => (
+          <div className={styles.facePreviewRow} key={photoTarget}>
+            {photos[photoTarget] && <div className={styles.facePreview} role="img"
+              aria-label={"Captured " + photoTarget + " photo"}
+              style={{ backgroundImage: 'url("' + photos[photoTarget] + '")' }} />}
+            <span>
+              <strong>{photoTarget === "reference" ? "1. Reference photo" : "2. New selfie"}</strong>
+              <small>{photos[photoTarget] ? "Captured" : "Not captured yet"}</small>
+            </span>
+            <button type="button" className={styles.retakeButton}
+              disabled={!consent || busy || opening || !!stream}
+              onClick={() => void startCamera(photoTarget)}>
+              {photos[photoTarget] ? "Retake" : "Open camera"}
+            </button>
+          </div>
+        ))}
+        <canvas ref={canvasRef} className={styles.hiddenCanvas} aria-hidden="true" />
+        {(opening || stream) && <>
+          <p style={{ margin: 0, fontSize: 12 }}>
+            {opening ? "Opening camera…" : "Capturing " + (target === "reference" ? "reference photo" : "new selfie")}
+          </p>
+          <div className={styles.cameraPreview} style={{ height: "auto", aspectRatio: "4 / 3" }}>
+            {stream ? <video ref={videoRef} autoPlay muted playsInline style={{ objectFit: "contain" }} /> : <span>Waiting for camera permission…</span>}
+          </div>
+          <button type="button" className={styles.cameraButton} disabled={!stream} onClick={capturePhoto}>Capture photo</button>
+          <button type="button" className={styles.cameraButton} onClick={stopCamera}>Cancel camera</button>
+        </>}
+      </div>
+      <button type="button" className={styles.submitButton} style={{ width: "100%", opacity: cannotCompare ? 0.55 : 1 }}
+        disabled={cannotCompare} onClick={() => void comparePhotos()}>
+        {busy ? "Comparing…" : "Compare faces"}
+      </button>
+      {busy && <p className={styles.message} role="status">Processing photos. The first comparison may take longer while the model loads.</p>}
+      {error && <p className={styles.error} role="alert">{error}</p>}
+      {result && <div className={result.matched ? styles.message : styles.error} role="status">
+        <strong>{result.matched ? "Face matched" : "Face did not match"}</strong>
+        <div>Distance: {result.distance.toFixed(6)} · Threshold: {result.threshold}</div>
+        <div>Lower distance means greater similarity. This result is not an attendance decision.</div>
+      </div>}
+      <button type="button" className={styles.cameraButton} style={{ marginTop: 16 }} disabled={busy}
+        onClick={onBack}>Back to login / signup</button>
+    </section>
   );
 }
