@@ -57,13 +57,28 @@ def test_empty_origin_list_disables_browser_access():
     assert Settings(cors_origins=[]).cors_origins == []
 
 
-def test_jwt_secret_key_is_required(monkeypatch):
-    monkeypatch.delenv("JWT_SECRET_KEY")
+def test_supabase_url_is_required(monkeypatch):
+    monkeypatch.delenv("SUPABASE_URL")
     with pytest.raises(ValidationError):
         Settings()
 
 
-def test_jwt_secret_key_must_be_long_enough(monkeypatch):
-    monkeypatch.setenv("JWT_SECRET_KEY", "too-short")
+def test_supabase_service_role_key_is_required(monkeypatch):
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY")
     with pytest.raises(ValidationError):
         Settings()
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["not-a-url", "http://insecure.supabase.co", "https://proj.supabase.co/extra", "https://proj.supabase.co?x=1"],
+)
+def test_settings_reject_invalid_supabase_url(monkeypatch, url):
+    monkeypatch.setenv("SUPABASE_URL", url)
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_settings_strip_trailing_slash_from_supabase_url(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://proj.supabase.co/")
+    assert Settings().supabase_url == "https://proj.supabase.co"

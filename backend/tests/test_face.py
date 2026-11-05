@@ -1,10 +1,14 @@
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from uuid import uuid4
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 
 from app.api.deps import get_db_session
 from app.models.student_face_embedding import StudentFaceEmbedding
 from app.models.user import User, UserRole
-from app.security.tokens import create_access_token
 from app.services import face_embedding
 
 
@@ -26,7 +30,6 @@ def make_user(role=UserRole.STUDENT, **overrides):
         id=uuid4(),
         email="student@unb.ca",
         full_name="Pat Student",
-        password_hash="unused",
         role=role,
         is_active=True,
     )
@@ -34,8 +37,41 @@ def make_user(role=UserRole.STUDENT, **overrides):
     return User(**defaults)
 
 
-def auth_header(app, settings, user):
-    token = create_access_token(user_id=user.id, role=user.role, settings=settings)
+class FakeSigningKey:
+    def __init__(self, key):
+        self.key = key
+
+
+class FakeJWKClient:
+    def __init__(self, key):
+        self._key = key
+
+    def get_signing_key_from_jwt(self, _token):
+        return FakeSigningKey(self._key)
+
+
+@pytest.fixture
+def signing_key():
+    return ec.generate_private_key(ec.SECP256R1())
+
+
+def auth_header(monkeypatch, signing_key, user):
+    monkeypatch.setattr(
+        "app.security.supabase_auth._jwks_client",
+        lambda _url: FakeJWKClient(signing_key),
+    )
+    now = datetime.now(timezone.utc)
+    token = jwt.encode(
+        {
+            "sub": str(user.id),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "iat": now,
+            "exp": now + timedelta(hours=1),
+        },
+        signing_key,
+        algorithm="ES256",
+    )
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -48,35 +84,35 @@ def test_verify_requires_authentication(client):
     assert response.status_code == 401
 
 
-def test_verify_rejects_a_non_student(app, client, settings):
+def test_verify_rejects_a_non_student(app, client, settings, signing_key, monkeypatch):
     professor = make_user(role=UserRole.PROFESSOR)
     app.dependency_overrides[get_db_session] = lambda: FakeSession(professor)
 
     response = client.post(
         "/face/verify",
         files=selfie_file(),
-        headers=auth_header(app, settings, professor),
+        headers=auth_header(monkeypatch, signing_key, professor),
     )
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Only students have an enrolled face."}
 
 
-def test_verify_rejects_when_no_face_is_enrolled(app, client, settings):
+def test_verify_rejects_when_no_face_is_enrolled(app, client, settings, signing_key, monkeypatch):
     student = make_user()
     app.dependency_overrides[get_db_session] = lambda: FakeSession(student, enrollment=None)
 
     response = client.post(
         "/face/verify",
         files=selfie_file(),
-        headers=auth_header(app, settings, student),
+        headers=auth_header(monkeypatch, signing_key, student),
     )
 
     assert response.status_code == 404
     assert response.json() == {"detail": "No face enrolled for your account yet."}
 
 
-def test_verify_rejects_an_incompatible_embedding_model(app, client, settings):
+def test_verify_rejects_an_incompatible_embedding_model(app, client, settings, signing_key, monkeypatch):
     student = make_user()
     enrollment = StudentFaceEmbedding(
         student_id=student.id, embedding=[0.0] * 512, model_name="OldModel"
@@ -86,14 +122,14 @@ def test_verify_rejects_an_incompatible_embedding_model(app, client, settings):
     response = client.post(
         "/face/verify",
         files=selfie_file(),
-        headers=auth_header(app, settings, student),
+        headers=auth_header(monkeypatch, signing_key, student),
     )
 
     assert response.status_code == 422
     assert response.json() == {"detail": "Incompatible face embedding model."}
 
 
-def test_verify_compares_against_the_students_own_enrollment(app, client, settings, monkeypatch):
+def test_verify_compares_against_the_students_own_enrollment(app, client, settings, signing_key, monkeypatch):
     student = make_user()
     enrollment = StudentFaceEmbedding(
         student_id=student.id, embedding=[0.1, 0.2], model_name=face_embedding.MODEL
@@ -116,7 +152,7 @@ def test_verify_compares_against_the_students_own_enrollment(app, client, settin
     response = client.post(
         "/face/verify",
         files=selfie_file(),
-        headers=auth_header(app, settings, student),
+        headers=auth_header(monkeypatch, signing_key, student),
     )
 
     assert response.status_code == 200

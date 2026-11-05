@@ -10,10 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_database_engine
 from app.models.user import User, UserRole
-from app.security.tokens import decode_access_token
+from app.security.supabase_auth import decode_supabase_token
 
-# Not OAuth2PasswordBearer: /auth/login takes a JSON body, not the OAuth2
-# password-grant form, so that scheme's Swagger "Authorize" dialog wouldn't
+# Not OAuth2PasswordBearer: sign-in happens against Supabase directly, not a
+# form POST to this API, so that scheme's Swagger "Authorize" dialog wouldn't
 # work against it. HTTPBearer instead just expects a token pasted in.
 # auto_error=False lets get_current_user return a uniform 401 for both a
 # missing and an invalid token, instead of FastAPI's default 403 on missing.
@@ -42,11 +42,14 @@ def get_current_user(
 
     settings = request.app.state.settings
     try:
-        payload = decode_access_token(credentials.credentials, settings)
+        payload = decode_supabase_token(credentials.credentials, settings)
         user_id = UUID(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         raise credentials_error from None
 
+    # The row in public.users is a profile keyed by the same id as
+    # auth.users; a Supabase account with no matching profile yet (e.g.
+    # created outside /auth/signup) is treated the same as no account.
     user = session.get(User, user_id)
     if user is None or not user.is_active:
         raise credentials_error

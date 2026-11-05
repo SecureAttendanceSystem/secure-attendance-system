@@ -1,78 +1,92 @@
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
 
 import jwt
 import pytest
-from pydantic import SecretStr
+from cryptography.hazmat.primitives.asymmetric import ec
 
-from app.models.user import UserRole
-from app.security.passwords import hash_password, verify_password
-from app.security.tokens import create_access_token, decode_access_token
+from app.security.supabase_auth import _jwks_client, decode_supabase_token
 
 
-def test_hashed_password_is_not_the_plaintext():
-    hashed = hash_password("correct-password")
-    assert hashed != "correct-password"
+@pytest.fixture
+def signing_key():
+    return ec.generate_private_key(ec.SECP256R1())
 
 
-def test_verify_password_accepts_the_matching_password():
-    hashed = hash_password("correct-password")
-    assert verify_password("correct-password", hashed) is True
+class FakeSigningKey:
+    def __init__(self, key):
+        self.key = key
 
 
-def test_verify_password_rejects_a_wrong_password():
-    hashed = hash_password("correct-password")
-    assert verify_password("wrong-password", hashed) is False
+class FakeJWKClient:
+    def __init__(self, key):
+        self._key = key
+
+    def get_signing_key_from_jwt(self, _token):
+        return FakeSigningKey(self._key)
 
 
-def test_verify_password_rejects_when_no_hash_exists():
-    # Used for a login attempt against an email that has no user row.
-    assert verify_password("anything", None) is False
+@pytest.fixture(autouse=True)
+def clear_jwks_cache():
+    _jwks_client.cache_clear()
+    yield
+    _jwks_client.cache_clear()
 
 
-def test_dummy_password_never_authenticates_a_missing_hash():
-    # This is the input used to generate the timing-only dummy hash.
-    assert verify_password("werkzeug.security", None) is False
-    assert verify_password("werkzeug.security", "") is False
-
-
-def test_verify_password_rejects_a_hash_in_an_unrecognized_scheme():
-    # e.g. a bcrypt hash ("$2a$06$...") seeded by something other than
-    # generate_password_hash; check_password_hash can't parse it and raises
-    # ValueError, which must not become an unhandled 500 during login.
-    bcrypt_like_hash = "$2a$06$" + "a" * 53
-    assert verify_password("whatever", bcrypt_like_hash) is False
-
-
-def test_access_token_round_trips_user_id_and_role(settings):
-    user_id = uuid4()
-    token = create_access_token(user_id=user_id, role=UserRole.PROFESSOR, settings=settings)
-    payload = decode_access_token(token, settings)
-    assert payload["sub"] == str(user_id)
-    assert payload["role"] == "professor"
-
-
-def test_expired_token_is_rejected(settings):
-    payload = {
-        "sub": str(uuid4()),
-        "role": "student",
-        "iat": datetime.now(timezone.utc) - timedelta(minutes=10),
-        "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
+def make_token(signing_key, **claim_overrides):
+    now = datetime.now(timezone.utc)
+    claims = {
+        "sub": "e2338ef7-4cc5-4766-8df7-2ffc460c86bd",
+        "aud": "authenticated",
+        "role": "authenticated",
+        "iat": now,
+        "exp": now + timedelta(hours=1),
     }
-    token = jwt.encode(
-        payload,
-        settings.jwt_secret_key.get_secret_value(),
-        algorithm=settings.jwt_algorithm,
-    )
-    with pytest.raises(jwt.ExpiredSignatureError):
-        decode_access_token(token, settings)
+    claims.update(claim_overrides)
+    return jwt.encode(claims, signing_key, algorithm="ES256")
 
 
-def test_token_signed_with_a_different_secret_is_rejected(settings):
-    user_id = uuid4()
-    token = create_access_token(user_id=user_id, role=UserRole.STUDENT, settings=settings)
-    other_settings = settings.model_copy(
-        update={"jwt_secret_key": SecretStr("a-completely-different-secret-value")}
+def test_decode_supabase_token_accepts_a_validly_signed_token(monkeypatch, settings, signing_key):
+    token = make_token(signing_key)
+    monkeypatch.setattr(
+        "app.security.supabase_auth._jwks_client",
+        lambda _url: FakeJWKClient(signing_key),
     )
+
+    payload = decode_supabase_token(token, settings)
+
+    assert payload["sub"] == "e2338ef7-4cc5-4766-8df7-2ffc460c86bd"
+
+
+def test_decode_supabase_token_rejects_a_token_signed_by_a_different_key(monkeypatch, settings, signing_key):
+    other_key = ec.generate_private_key(ec.SECP256R1())
+    token = make_token(other_key)
+    monkeypatch.setattr(
+        "app.security.supabase_auth._jwks_client",
+        lambda _url: FakeJWKClient(signing_key),
+    )
+
     with pytest.raises(jwt.InvalidSignatureError):
-        decode_access_token(token, other_settings)
+        decode_supabase_token(token, settings)
+
+
+def test_decode_supabase_token_rejects_an_expired_token(monkeypatch, settings, signing_key):
+    now = datetime.now(timezone.utc)
+    token = make_token(signing_key, iat=now - timedelta(hours=2), exp=now - timedelta(hours=1))
+    monkeypatch.setattr(
+        "app.security.supabase_auth._jwks_client",
+        lambda _url: FakeJWKClient(signing_key),
+    )
+
+    with pytest.raises(jwt.ExpiredSignatureError):
+        decode_supabase_token(token, settings)
+
+
+def test_decode_supabase_token_rejects_the_wrong_audience(monkeypatch, settings, signing_key):
+    token = make_token(signing_key, aud="some-other-audience")
+    monkeypatch.setattr(
+        "app.security.supabase_auth._jwks_client",
+        lambda _url: FakeJWKClient(signing_key),
+    )
+
+    with pytest.raises(jwt.InvalidAudienceError):
+        decode_supabase_token(token, settings)

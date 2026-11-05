@@ -1,14 +1,8 @@
-from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import UserRole
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=1, max_length=128)
 
 
 class SignupRequest(BaseModel):
@@ -26,9 +20,3 @@ class UserPublic(BaseModel):
     full_name: str
     role: UserRole
     is_active: bool
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: Literal["bearer"] = "bearer"
-    user: UserPublic

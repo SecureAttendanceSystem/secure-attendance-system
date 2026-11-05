@@ -20,17 +20,16 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
-    jwt_secret_key: SecretStr
-    jwt_algorithm: Literal["HS256"] = "HS256"
-    access_token_expire_minutes: int = Field(default=30, gt=0)
+    supabase_url: str
+    supabase_service_role_key: SecretStr
 
-    @field_validator("jwt_secret_key")
+    @field_validator("supabase_url")
     @classmethod
-    def validate_jwt_secret_key(cls, value: SecretStr) -> SecretStr:
-        # HS256 signatures are only as strong as the key; RFC 7518 recommends
-        # at least 32 bytes (matching the HMAC-SHA256 output size).
-        if len(value.get_secret_value()) < 32:
-            raise ValueError("JWT_SECRET_KEY must be at least 32 characters")
+    def validate_supabase_url(cls, value: str) -> str:
+        value = value.rstrip("/")
+        url = urlsplit(value)
+        if url.scheme != "https" or not url.hostname or url.path or url.query:
+            raise ValueError("SUPABASE_URL must be a bare https URL, e.g. https://xyz.supabase.co")
         return value
 
     @field_validator("database_url")

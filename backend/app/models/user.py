@@ -1,8 +1,8 @@
 from datetime import datetime
 from enum import Enum
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, String, Uuid, func, text
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, ForeignKey, String, Uuid, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
@@ -15,12 +15,16 @@ class UserRole(str, Enum):
 
 
 class User(Base):
+    """Profile data for a Supabase Auth user; credentials live in auth.users."""
+
     __tablename__ = "users"
 
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    # Same id as the matching auth.users row; never self-generated here.
+    id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("auth.users.id", ondelete="CASCADE"), primary_key=True
+    )
     email: Mapped[str] = mapped_column(String(320), unique=True)
     full_name: Mapped[str] = mapped_column(String(200))
-    password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(
         SQLEnum(
             UserRole,
