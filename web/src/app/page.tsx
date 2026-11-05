@@ -1,21 +1,66 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import styles from "./page.module.css";
 
-// This type keeps locally created demo accounts aligned with the available sign-up roles.
 type Role = "student" | "professor";
 type AuthMode = "login" | "signup";
+type ThemeMode = "light" | "dark";
 type Account = { email: string; password: string; role: Role };
 
-// These sample credentials make it possible to preview both account roles without a backend.
+// Turn this on when self-service sign-up is ready to be shown again.
+const SIGN_UP_ENABLED = false;
+
+// Read the saved preference after hydration so server and browser markup initially agree.
+const themeListeners = new Set<() => void>();
+let fallbackTheme: ThemeMode = "light";
+
+function getThemeSnapshot(): ThemeMode {
+  try {
+    const savedTheme = window.localStorage.getItem("attendance-theme");
+    fallbackTheme = savedTheme === "dark" ? "dark" : "light";
+  } catch (error) {
+    console.error("Could not read the theme preference.", error);
+  }
+  return fallbackTheme;
+}
+
+function subscribeToTheme(listener: () => void) {
+  themeListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    themeListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+
+function saveThemePreference(theme: ThemeMode) {
+  fallbackTheme = theme;
+  try {
+    window.localStorage.setItem("attendance-theme", theme);
+  } catch (error) {
+    console.error("Could not save the theme preference.", error);
+  }
+  themeListeners.forEach((listener) => listener());
+}
+
 const demoAccounts: Account[] = [
   { email: "student@unb.ca", password: "Student123!", role: "student" },
   { email: "professor@unb.ca", password: "Professor123!", role: "professor" },
 ];
 
-// This component contains only the sign-in and sign-up screens; authenticated pages are out of scope.
 export default function Home() {
+  const theme = useSyncExternalStore(
+    subscribeToTheme,
+    getThemeSnapshot,
+    () => "light",
+  );
   const [mode, setMode] = useState<AuthMode>("login");
   const [role, setRole] = useState<Role>("student");
   const [email, setEmail] = useState("");
@@ -31,7 +76,10 @@ export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // This effect shows the requested camera stream and releases it when the preview closes.
+  function toggleTheme() {
+    saveThemePreference(theme === "light" ? "dark" : "light");
+  }
+
   useEffect(() => {
     const video = videoRef.current;
     if (video && cameraStream) {
@@ -44,7 +92,6 @@ export default function Home() {
     return () => cameraStream?.getTracks().forEach((track) => track.stop());
   }, [cameraStream]);
 
-  // This handler validates demo credentials and keeps all form actions on the login screen.
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -91,7 +138,6 @@ export default function Home() {
     setMessage(`Demo sign-in successful for the ${account.role} account. Dashboards are not included yet.`);
   }
 
-  // This helper switches between the two forms and clears status from the previous form.
   function changeMode(nextMode: AuthMode) {
     stopCamera();
     setMode(nextMode);
@@ -102,7 +148,6 @@ export default function Home() {
     setPrivacyConsent(false);
   }
 
-  // This function requests camera access only after the user starts face registration.
   async function startCamera() {
     setCameraError("");
     setError("");
@@ -130,7 +175,6 @@ export default function Home() {
     }
   }
 
-  // This function creates a temporary in-memory image preview and immediately stops the camera.
   function captureFacePreview() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -153,177 +197,233 @@ export default function Home() {
     stopCamera();
   }
 
-  // This helper releases the camera when the preview is captured or the user changes forms.
   function stopCamera() {
     cameraStream?.getTracks().forEach((track) => track.stop());
     setCameraStream(null);
   }
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${theme === "dark" ? styles.dark : ""}`}>
+      {/* Keep the product name and theme control together in the page header. */}
       <header className={styles.header}>
         <a aria-label="Secure University Attendance System home" className={styles.brand} href="#">
           <span aria-hidden="true" className={styles.brandMark}>SA</span>
           <span>Secure Attendance System</span>
         </a>
-        <span className={styles.school}>UNIVERSITY OF NEW BRUNSWICK</span>
+        <div className={styles.headerActions}>
+          <span className={styles.school}>UNB ATTENDANCE PORTAL</span>
+          <button
+            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+            aria-pressed={theme === "dark"}
+            className={styles.themeToggle}
+            onClick={toggleTheme}
+            type="button"
+          >
+            <span aria-hidden="true" className={styles.themeIcon}>
+              {theme === "light" ? "☾" : "☼"}
+            </span>
+            <span>{theme === "light" ? "Dark" : "Light"} mode</span>
+          </button>
+        </div>
       </header>
 
-      <section aria-labelledby="form-heading" className={styles.authCard}>
-        <div className={styles.cardHeading}>
-          <p className={styles.eyebrow}>SECURE ATTENDANCE</p>
-          <h1 id="form-heading">
-            {mode === "login" ? "Welcome back" : "Create your account"}
-          </h1>
-          <p>
-            {mode === "login"
-              ? "Sign in to your university account."
-              : "A few details to get you started."}
+      <div className={styles.mainLayout}>
+        <section aria-labelledby="intro-heading" className={styles.intro}>
+          <p className={styles.eyebrow}>UNIVERSITY OF NEW BRUNSWICK</p>
+          <h1 id="intro-heading">Attendance, made simple.</h1>
+          <p className={styles.introCopy}>
+            Sign in to manage campus attendance in one place.
           </p>
-        </div>
 
-        <div aria-label="Account access" className={styles.tabs} role="tablist">
-          <button
-            aria-selected={mode === "login"}
-            className={mode === "login" ? styles.selectedTab : ""}
-            onClick={() => changeMode("login")}
-            role="tab"
-            type="button"
+          {/* This card is a static visual preview; it does not display live class data. */}
+          <div aria-label="Attendance portal preview" className={styles.previewCard}>
+            <div className={styles.previewTopline}>
+              <span>STUDENT & FACULTY ACCESS</span>
+            </div>
+            <p className={styles.previewTitle}>Campus<br />attendance</p>
+            <div className={styles.classCard}>
+              <span aria-hidden="true" className={styles.classIcon}>SA</span>
+              <span className={styles.classDetails}>
+                <strong>Secure Attendance</strong>
+                <small>University of New Brunswick</small>
+              </span>
+            </div>
+            <div aria-hidden="true" className={styles.previewAccent} />
+          </div>
+
+          <p className={styles.introNote}>
+            For students and instructors
+          </p>
+        </section>
+
+        <section aria-labelledby="form-heading" className={styles.authCard}>
+          <div className={styles.cardHeading}>
+            <p className={styles.eyebrow}>CAMPUS PORTAL</p>
+            <h2 id="form-heading">
+              {mode === "login" ? "Welcome back." : "Create your account."}
+            </h2>
+            <p>
+              {mode === "login"
+                ? "Sign in with your university account."
+                : "A few details to get you started."}
+            </p>
+          </div>
+
+          <div
+            aria-label="Account access"
+            className={`${styles.tabs} ${!SIGN_UP_ENABLED ? styles.loginOnlyTabs : ""}`}
+            role="tablist"
           >
-            Log in
-          </button>
-          <button
-            aria-selected={mode === "signup"}
-            className={mode === "signup" ? styles.selectedTab : ""}
-            onClick={() => changeMode("signup")}
-            role="tab"
-            type="button"
-          >
-            Sign up
-          </button>
-        </div>
+            <button
+              aria-selected={mode === "login"}
+              className={mode === "login" ? styles.selectedTab : ""}
+              onClick={() => changeMode("login")}
+              role="tab"
+              type="button"
+            >
+              Log in
+            </button>
+            {SIGN_UP_ENABLED && (
+              <button
+                aria-selected={mode === "signup"}
+                className={mode === "signup" ? styles.selectedTab : ""}
+                onClick={() => changeMode("signup")}
+                role="tab"
+                type="button"
+              >
+                Sign up
+              </button>
+            )}
+          </div>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
-          {mode === "signup" && (
-            <>
-              <label htmlFor="full-name">Full name</label>
-              <input
-                autoComplete="name"
-                id="full-name"
-                onChange={(event) => setFullName(event.target.value)}
-                placeholder="Your name"
-                required
-                value={fullName}
-              />
+          <form className={styles.form} onSubmit={handleSubmit}>
+            {mode === "signup" && (
+              <>
+                <label htmlFor="full-name">Full name</label>
+                <input
+                  autoComplete="name"
+                  id="full-name"
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="Your name"
+                  required
+                  value={fullName}
+                />
 
-              <label>Account type</label>
-              <div aria-label="Account type" className={styles.roleButtons}>
-                <button
-                  aria-pressed={role === "student"}
-                  className={role === "student" ? styles.selectedRole : ""}
-                  onClick={() => setRole("student")}
-                  type="button"
-                >
-                  Student
-                </button>
-                <button
-                  aria-pressed={role === "professor"}
-                  className={role === "professor" ? styles.selectedRole : ""}
-                  onClick={() => setRole("professor")}
-                  type="button"
-                >
-                  Professor
-                </button>
-              </div>
-            </>
-          )}
-
-          <label htmlFor="email">University email</label>
-          <input
-            autoComplete="username"
-            id="email"
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@unb.ca"
-            required
-            type="email"
-            value={email}
-          />
-
-          <label htmlFor="password">Password</label>
-          <input
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            id="password"
-            minLength={8}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder={mode === "login" ? "Enter your password" : "At least 8 characters"}
-            required
-            type="password"
-            value={password}
-          />
-
-          {mode === "signup" && (
-            <div className={styles.faceSection}>
-              <div className={styles.faceHeading}>
-                <span>
-                  <strong>Face registration</strong>
-                  <small>Register one face with your account</small>
-                </span>
-                <span className={styles.required}>REQUIRED</span>
-              </div>
-              <canvas aria-hidden="true" className={styles.hiddenCanvas} ref={canvasRef} />
-              {facePreview ? (
-                <div className={styles.facePreviewRow}>
-                  {/* This temporary image stays in memory only and is cleared when the form is reset. */}
-                  <div
-                    aria-label="Temporary face-registration preview"
-                    className={styles.facePreview}
-                    role="img"
-                    style={{ backgroundImage: `url("${facePreview}")` }}
-                  />
-                  <span><strong>Preview captured</strong><small>Not uploaded or saved</small></span>
-                  <button className={styles.retakeButton} onClick={startCamera} type="button">
-                    Retake
+                <label>Account type</label>
+                <div aria-label="Account type" className={styles.roleButtons}>
+                  <button
+                    aria-pressed={role === "student"}
+                    className={role === "student" ? styles.selectedRole : ""}
+                    onClick={() => setRole("student")}
+                    type="button"
+                  >
+                    Student
+                  </button>
+                  <button
+                    aria-pressed={role === "professor"}
+                    className={role === "professor" ? styles.selectedRole : ""}
+                    onClick={() => setRole("professor")}
+                    type="button"
+                  >
+                    Professor
                   </button>
                 </div>
-              ) : (
-                <div className={styles.cameraPreview}>
-                  {cameraStream ? (
-                    <video autoPlay muted playsInline ref={videoRef} />
-                  ) : (
-                    <span>Camera preview will appear here</span>
-                  )}
+              </>
+            )}
+
+            <label htmlFor="email">University email</label>
+            <input
+              autoComplete="username"
+              id="email"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@unb.ca"
+              required
+              type="email"
+              value={email}
+            />
+
+            <label htmlFor="password">Password</label>
+            <input
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              id="password"
+              minLength={8}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={mode === "login" ? "Enter your password" : "At least 8 characters"}
+              required
+              type="password"
+              value={password}
+            />
+
+            {mode === "signup" && (
+              /* The sign-up preview stays in the browser and is not uploaded. */
+              <div className={styles.faceSection}>
+                <div className={styles.faceHeading}>
+                  <span>
+                    <strong>Face registration</strong>
+                    <small>Register one face with your account</small>
+                  </span>
+                  <span className={styles.required}>REQUIRED</span>
                 </div>
-              )}
-              {cameraError && <p className={styles.error} role="alert">{cameraError}</p>}
-              {!facePreview && (
-                <button
-                  className={styles.cameraButton}
-                  onClick={cameraStream ? captureFacePreview : startCamera}
-                  type="button"
-                >
-                  {cameraStream ? "Capture face preview" : "Start face registration"}
-                </button>
-              )}
-              <label className={styles.consent}>
-                <input
-                  checked={privacyConsent}
-                  onChange={(event) => setPrivacyConsent(event.target.checked)}
-                  type="checkbox"
-                />
-                I understand this is a local camera preview.
-              </label>
-            </div>
-          )}
+                <canvas aria-hidden="true" className={styles.hiddenCanvas} ref={canvasRef} />
+                {facePreview ? (
+                  <div className={styles.facePreviewRow}>
+                    <div
+                      aria-label="Temporary face-registration preview"
+                      className={styles.facePreview}
+                      role="img"
+                      style={{ backgroundImage: `url("${facePreview}")` }}
+                    />
+                    <span><strong>Preview captured</strong><small>Not uploaded or saved</small></span>
+                    <button className={styles.retakeButton} onClick={startCamera} type="button">
+                      Retake
+                    </button>
+                  </div>
+                ) : (
+                  <div className={styles.cameraPreview}>
+                    {cameraStream ? (
+                      <video autoPlay muted playsInline ref={videoRef} />
+                    ) : (
+                      <span>Camera preview will appear here</span>
+                    )}
+                  </div>
+                )}
+                {cameraError && <p className={styles.error} role="alert">{cameraError}</p>}
+                {!facePreview && (
+                  <button
+                    className={styles.cameraButton}
+                    onClick={cameraStream ? captureFacePreview : startCamera}
+                    type="button"
+                  >
+                    {cameraStream ? "Capture face preview" : "Start face registration"}
+                  </button>
+                )}
+                <label className={styles.consent}>
+                  <input
+                    checked={privacyConsent}
+                    onChange={(event) => setPrivacyConsent(event.target.checked)}
+                    type="checkbox"
+                  />
+                  I understand this is a local camera preview.
+                </label>
+              </div>
+            )}
 
-          {error && <p className={styles.error} role="alert">{error}</p>}
-          {message && <p className={styles.message} role="status">{message}</p>}
+            {error && <p className={styles.error} role="alert">{error}</p>}
+            {message && <p className={styles.message} role="status">{message}</p>}
 
-          <button className={styles.submitButton} type="submit">
-            {mode === "login" ? "Log in" : "Create account"}
-          </button>
-        </form>
+            <button className={styles.submitButton} type="submit">
+              {mode === "login" ? "Log in" : "Create account"}
+            </button>
+          </form>
 
-      </section>
+          <p className={styles.cardFooter}>University of New Brunswick · Campus access</p>
+        </section>
+      </div>
+
+      <footer className={styles.footer}>
+        <span>Secure Attendance System</span>
+        <span>Designed for your campus day</span>
+      </footer>
     </main>
   );
 }
