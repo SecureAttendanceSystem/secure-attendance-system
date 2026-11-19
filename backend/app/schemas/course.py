@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -22,3 +23,12 @@ class CoursePublic(BaseModel):
     code: str
     title: str
     term: str
+
+
+class RosterStudent(BaseModel):
+    """One enrolled student as shown to admins and the course's professors."""
+
+    id: UUID
+    email: str
+    full_name: str
+    enrolled_at: datetime

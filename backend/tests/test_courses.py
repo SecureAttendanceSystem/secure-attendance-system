@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -23,10 +24,11 @@ class FakeSession:
     composite keys are tuples, e.g. (CourseInstructor, (course_id, professor_id)).
     """
 
-    def __init__(self, user, objects=None, listed=None):
+    def __init__(self, user, objects=None, listed=None, rows=None):
         self.user = user
         self.objects = dict(objects or {})
         self.listed = listed or []
+        self.rows = rows or []
         self.statements = []
         self.added = []
         self.deleted = []
@@ -42,6 +44,10 @@ class FakeSession:
     def scalars(self, statement):
         self.statements.append(statement)
         return FakeScalarResult(self.listed)
+
+    def execute(self, statement):
+        self.statements.append(statement)
+        return FakeScalarResult(self.rows)
 
     def add(self, obj):
         # Mimic the primary-key default SQLAlchemy would assign on flush.
@@ -409,3 +415,246 @@ def test_removing_a_professor_who_is_not_assigned_returns_404(app, client, setti
     )
 
     assert response.status_code == 404
+
+
+# -- Roster: /courses/{course_id}/students ----------------------------------------
+
+
+def teaching_session(professor, course, **extra_objects):
+    """A session where `professor` teaches `course`."""
+    link = CourseInstructor(course_id=course.id, professor_id=professor.id)
+    objects = {
+        (Course, course.id): course,
+        (CourseInstructor, (course.id, professor.id)): link,
+    }
+    objects.update(extra_objects.pop("objects", {}))
+    return FakeSession(professor, objects=objects, **extra_objects)
+
+
+def test_professor_can_view_the_roster_of_a_course_they_teach(app, client, settings):
+    professor = make_user(UserRole.PROFESSOR)
+    student = make_user(UserRole.STUDENT, full_name="Pat Student")
+    course = make_course()
+    enrolled_at = datetime(2026, 9, 5, tzinfo=timezone.utc)
+    session = use_session(
+        app, teaching_session(professor, course, rows=[(student, enrolled_at)])
+    )
+
+    response = client.get(
+        f"/courses/{course.id}/students", headers=auth_header(settings, professor)
+    )
+
+    assert response.status_code == 200
+    [entry] = response.json()
+    assert entry["id"] == str(student.id)
+    assert entry["full_name"] == "Pat Student"
+    assert entry["email"] == student.email
+    assert entry["enrolled_at"].startswith("2026-09-05")
+    assert "password_hash" not in entry
+    statement = session.statements[0]
+    assert course.id in statement.compile().params.values()
+
+
+def test_admin_can_view_any_roster(app, client, settings):
+    admin = make_user(UserRole.ADMIN)
+    course = make_course()
+    use_session(app, FakeSession(admin, objects={(Course, course.id): course}))
+
+    response = client.get(f"/courses/{course.id}/students", headers=auth_header(settings, admin))
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_professor_gets_404_for_the_roster_of_a_course_they_do_not_teach(
+    app, client, settings
+):
+    professor = make_user(UserRole.PROFESSOR)
+    course = make_course()
+    use_session(app, FakeSession(professor, objects={(Course, course.id): course}))
+
+    response = client.get(
+        f"/courses/{course.id}/students", headers=auth_header(settings, professor)
+    )
+
+    assert response.status_code == 404
+
+
+def test_enrolled_student_cannot_view_the_roster(app, client, settings):
+    student = make_user(UserRole.STUDENT)
+    course = make_course()
+    enrollment = Enrollment(course_id=course.id, student_id=student.id)
+    use_session(
+        app,
+        FakeSession(
+            student,
+            objects={
+                (Course, course.id): course,
+                (Enrollment, (course.id, student.id)): enrollment,
+            },
+        ),
+    )
+
+    response = client.get(f"/courses/{course.id}/students", headers=auth_header(settings, student))
+
+    assert response.status_code == 403
+
+
+def test_professor_can_enroll_a_student_in_a_course_they_teach(app, client, settings):
+    professor = make_user(UserRole.PROFESSOR)
+    student = make_user(UserRole.STUDENT)
+    course = make_course()
+    session = use_session(
+        app, teaching_session(professor, course, objects={(User, student.id): student})
+    )
+
+    response = client.put(
+        f"/courses/{course.id}/students/{student.id}",
+        headers=auth_header(settings, professor),
+    )
+
+    assert response.status_code == 204
+    [enrollment] = session.added
+    assert (enrollment.course_id, enrollment.student_id) == (course.id, student.id)
+    assert session.committed is True
+
+
+def test_admin_can_enroll_a_student_in_any_course(app, client, settings):
+    admin = make_user(UserRole.ADMIN)
+    student = make_user(UserRole.STUDENT)
+    course = make_course()
+    session = use_session(
+        app,
+        FakeSession(admin, objects={(Course, course.id): course, (User, student.id): student}),
+    )
+
+    response = client.put(
+        f"/courses/{course.id}/students/{student.id}", headers=auth_header(settings, admin)
+    )
+
+    assert response.status_code == 204
+    assert len(session.added) == 1
+
+
+def test_professor_cannot_enroll_students_in_a_course_they_do_not_teach(
+    app, client, settings
+):
+    professor = make_user(UserRole.PROFESSOR)
+    student = make_user(UserRole.STUDENT)
+    course = make_course()
+    session = use_session(
+        app,
+        FakeSession(
+            professor, objects={(Course, course.id): course, (User, student.id): student}
+        ),
+    )
+
+    response = client.put(
+        f"/courses/{course.id}/students/{student.id}",
+        headers=auth_header(settings, professor),
+    )
+
+    assert response.status_code == 404
+    assert session.added == []
+
+
+def test_student_cannot_enroll_themselves(app, client, settings):
+    student = make_user(UserRole.STUDENT)
+    course = make_course()
+    session = use_session(app, FakeSession(student, objects={(Course, course.id): course}))
+
+    response = client.put(
+        f"/courses/{course.id}/students/{student.id}", headers=auth_header(settings, student)
+    )
+
+    assert response.status_code == 404
+    assert session.added == []
+
+
+def test_only_active_students_can_be_enrolled(app, client, settings):
+    professor = make_user(UserRole.PROFESSOR)
+    other_professor = make_user(UserRole.PROFESSOR)
+    disabled_student = make_user(UserRole.STUDENT, is_active=False)
+    course = make_course()
+    session = use_session(
+        app,
+        teaching_session(
+            professor,
+            course,
+            objects={
+                (User, other_professor.id): other_professor,
+                (User, disabled_student.id): disabled_student,
+            },
+        ),
+    )
+
+    for user_id in (other_professor.id, disabled_student.id, uuid4()):
+        response = client.put(
+            f"/courses/{course.id}/students/{user_id}",
+            headers=auth_header(settings, professor),
+        )
+        assert response.status_code == 422
+
+    assert session.added == []
+
+
+def test_enrolling_an_already_enrolled_student_is_a_no_op(app, client, settings):
+    professor = make_user(UserRole.PROFESSOR)
+    student = make_user(UserRole.STUDENT)
+    course = make_course()
+    enrollment = Enrollment(course_id=course.id, student_id=student.id)
+    session = use_session(
+        app,
+        teaching_session(
+            professor,
+            course,
+            objects={
+                (User, student.id): student,
+                (Enrollment, (course.id, student.id)): enrollment,
+            },
+        ),
+    )
+
+    response = client.put(
+        f"/courses/{course.id}/students/{student.id}",
+        headers=auth_header(settings, professor),
+    )
+
+    assert response.status_code == 204
+    assert session.added == []
+
+
+def test_professor_can_remove_a_student_from_a_course_they_teach(app, client, settings):
+    professor = make_user(UserRole.PROFESSOR)
+    course = make_course()
+    student_id = uuid4()
+    enrollment = Enrollment(course_id=course.id, student_id=student_id)
+    session = use_session(
+        app,
+        teaching_session(
+            professor, course, objects={(Enrollment, (course.id, student_id)): enrollment}
+        ),
+    )
+
+    response = client.delete(
+        f"/courses/{course.id}/students/{student_id}",
+        headers=auth_header(settings, professor),
+    )
+
+    assert response.status_code == 204
+    assert session.deleted == [enrollment]
+    assert session.committed is True
+
+
+def test_removing_a_student_who_is_not_enrolled_returns_404(app, client, settings):
+    professor = make_user(UserRole.PROFESSOR)
+    course = make_course()
+    session = use_session(app, teaching_session(professor, course))
+
+    response = client.delete(
+        f"/courses/{course.id}/students/{uuid4()}",
+        headers=auth_header(settings, professor),
+    )
+
+    assert response.status_code == 404
+    assert session.deleted == []
