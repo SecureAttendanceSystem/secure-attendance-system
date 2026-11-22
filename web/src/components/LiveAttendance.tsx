@@ -196,18 +196,20 @@ export default function LiveAttendance({ role }: { role: string }) {
               {passkeys === null
                 ? "Checking…"
                 : passkeys.length > 0
-                  ? `Set up (${passkeys.length} device${passkeys.length === 1 ? "" : "s"})`
-                  : "Not set up yet"}
+                  ? "Set up. To use a different device, ask an administrator to replace it."
+                  : "Not set up yet. You can register one passkey."}
             </small>
           </span>
-          <button
-            className={styles.retakeButton}
-            disabled={busy !== null || !webAuthnSupported}
-            onClick={() => void registerPasskey()}
-            type="button"
-          >
-            {busy === "passkey" ? "Waiting…" : passkeys?.length ? "Add this device" : "Set up passkey"}
-          </button>
+          {passkeys !== null && passkeys.length === 0 && (
+            <button
+              className={styles.retakeButton}
+              disabled={busy !== null || !webAuthnSupported}
+              onClick={() => void registerPasskey()}
+              type="button"
+            >
+              {busy === "passkey" ? "Waiting…" : "Set up passkey"}
+            </button>
+          )}
         </div>
       )}
       {!webAuthnSupported && (

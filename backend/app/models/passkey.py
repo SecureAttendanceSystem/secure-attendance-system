@@ -28,10 +28,18 @@ from app.models.enums import ChallengePurpose, enum_column
 
 class PasskeyCredential(Base):
     __tablename__ = "passkey_credentials"
-    __table_args__ = (Index("ix_passkey_credentials_user_id", "user_id"),)
+    __table_args__ = (
+        # One passkey per student for each site (relying party). In production the
+        # site never changes, so this is one passkey per student; a demo on a new
+        # tunnel address gets a fresh slot. Rows from before rp_id was recorded have
+        # NULL, which Postgres treats as distinct, so they never block a new one.
+        Index("uq_passkey_credentials_user_id_rp_id", "user_id", "rp_id", unique=True),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"))
+    # The WebAuthn RP ID (site) the passkey was created for; it only works there.
+    rp_id: Mapped[str | None] = mapped_column(String(253))
     # Raw credential ID chosen by the authenticator (base64url on the wire).
     credential_id: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
     # COSE-encoded public key from the registration response.

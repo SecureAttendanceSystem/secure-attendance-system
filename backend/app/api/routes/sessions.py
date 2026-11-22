@@ -210,12 +210,10 @@ def check_in_options(
     if find_attendance(db, live.id, student.id) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "You have already checked in")
 
-    credentials = db.scalars(
-        select(PasskeyCredential).where(PasskeyCredential.user_id == student.id)
-    ).all()
+    credentials = passkeys.current_credentials(db, student, request.app.state.settings)
     if not credentials:
         raise HTTPException(
-            status.HTTP_409_CONFLICT, "Set up a passkey on this device before checking in"
+            status.HTTP_409_CONFLICT, "Set up your passkey before checking in"
         )
 
     options, challenge = passkeys.authentication_options(request.app.state.settings, credentials)
@@ -251,6 +249,7 @@ def check_in(
         select(PasskeyCredential).where(
             PasskeyCredential.credential_id == credential_id,
             PasskeyCredential.user_id == student.id,
+            PasskeyCredential.rp_id == request.app.state.settings.webauthn_rp_id,
         )
     ).first()
     if credential is None:

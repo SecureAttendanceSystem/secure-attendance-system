@@ -11,7 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from webauthn import (
     generate_authentication_options,
@@ -57,6 +57,19 @@ def _descriptor(credential: PasskeyCredential) -> PublicKeyCredentialDescriptor:
         if value in _KNOWN_TRANSPORTS
     ]
     return PublicKeyCredentialDescriptor(id=credential.credential_id, transports=transports or None)
+
+
+def current_credentials(db: Session, user: User, settings: Settings) -> list[PasskeyCredential]:
+    """The user's passkeys for this site. Passkeys made for another RP ID (or before
+    rp_id was recorded) can't sign for this site, so they are ignored."""
+    return list(
+        db.scalars(
+            select(PasskeyCredential).where(
+                PasskeyCredential.user_id == user.id,
+                PasskeyCredential.rp_id == settings.webauthn_rp_id,
+            )
+        ).all()
+    )
 
 
 def issue_challenge(
@@ -115,9 +128,7 @@ def consume_challenge(
     return row.challenge
 
 
-def registration_options(
-    settings: Settings, user: User, existing: list[PasskeyCredential]
-) -> tuple[dict[str, Any], bytes]:
+def registration_options(settings: Settings, user: User) -> tuple[dict[str, Any], bytes]:
     options = generate_registration_options(
         rp_id=settings.webauthn_rp_id,
         rp_name=settings.webauthn_rp_name,
@@ -129,7 +140,6 @@ def registration_options(
             resident_key=ResidentKeyRequirement.PREFERRED,
             user_verification=UserVerificationRequirement.REQUIRED,
         ),
-        exclude_credentials=[_descriptor(credential) for credential in existing],
     )
     return json.loads(options_to_json(options)), options.challenge
 

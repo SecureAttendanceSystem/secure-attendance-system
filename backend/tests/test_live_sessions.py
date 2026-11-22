@@ -108,6 +108,8 @@ class FakeSession:
         self.commits = 0
         self.rolled_back = False
         self.commit_error = None
+        # Optional predicate: raise commit_error only once it returns true for this session.
+        self.fail_commit_when = None
 
     def of(self, model):
         return [obj for obj in self.objects if isinstance(obj, model)]
@@ -124,7 +126,7 @@ class FakeSession:
         self.objects = [
             obj
             for obj in self.objects
-            if obj.__table__ is not statement.table or not _matches(obj, statement.whereclause)
+            if obj.__table__.name != statement.table.name or not _matches(obj, statement.whereclause)
         ]
 
     def add(self, obj):
@@ -138,7 +140,8 @@ class FakeSession:
         self.objects.remove(obj)
 
     def commit(self):
-        if self.commit_error is not None:
+        failing = self.fail_commit_when is None or self.fail_commit_when(self)
+        if self.commit_error is not None and failing:
             raise self.commit_error
         self.commits += 1
 
@@ -224,11 +227,12 @@ class SoftAuthenticator:
             "clientExtensionResults": {},
         }
 
-    def stored_credential(self, user):
+    def stored_credential(self, user, rp_id=RP_ID):
         """The row a successful registration would have stored for this authenticator."""
         return PasskeyCredential(
             id=uuid4(),
             user_id=user.id,
+            rp_id=rp_id,
             credential_id=self.credential_id,
             public_key=self._cose_public_key(),
             sign_count=0,
@@ -535,6 +539,84 @@ def test_another_users_challenge_cannot_be_used(client, world):
     assert len(world.db.of(WebAuthnChallenge)) == 1
 
 
+def test_registered_passkey_records_its_site(client, world):
+    assert register(client, world, SoftAuthenticator()).status_code == 201
+
+    [credential] = world.db.of(PasskeyCredential)
+    assert credential.rp_id == RP_ID
+
+
+def test_student_with_a_passkey_cannot_register_another(client, world):
+    world.add(SoftAuthenticator().stored_credential(world.student))
+
+    response = client.post("/passkeys/register/options", headers=auth_header(world.student))
+
+    assert response.status_code == 409
+    assert "administrator" in response.json()["detail"]
+    assert world.db.of(WebAuthnChallenge) == []
+
+
+def test_second_registration_finished_in_another_tab_is_rejected(client, world):
+    first, second = SoftAuthenticator(), SoftAuthenticator()
+    options = client.post("/passkeys/register/options", headers=auth_header(world.student)).json()
+    assert register(client, world, first).status_code == 201
+
+    response = client.post(
+        "/passkeys/register",
+        json={"challenge_id": options["challenge_id"], "credential": second.register(options["options"])},
+        headers=auth_header(world.student),
+    )
+
+    assert response.status_code == 400  # its challenge was replaced by the later options call
+    assert len(world.db.of(PasskeyCredential)) == 1
+
+
+def test_registration_after_a_passkey_appears_is_rejected(client, world):
+    authenticator = SoftAuthenticator()
+    options = client.post("/passkeys/register/options", headers=auth_header(world.student)).json()
+    world.add(SoftAuthenticator().stored_credential(world.student))
+
+    response = client.post(
+        "/passkeys/register",
+        json={"challenge_id": options["challenge_id"], "credential": authenticator.register(options["options"])},
+        headers=auth_header(world.student),
+    )
+
+    assert response.status_code == 409
+    assert len(world.db.of(PasskeyCredential)) == 1
+
+
+def test_concurrent_registration_is_reported_as_a_conflict(client, world):
+    authenticator = SoftAuthenticator()
+    options = client.post("/passkeys/register/options", headers=auth_header(world.student)).json()
+    world.db.commit_error = IntegrityError("INSERT", {}, Exception("duplicate key"))
+    world.db.fail_commit_when = lambda db: db.of(PasskeyCredential)
+
+    response = client.post(
+        "/passkeys/register",
+        json={"challenge_id": options["challenge_id"], "credential": authenticator.register(options["options"])},
+        headers=auth_header(world.student),
+    )
+
+    assert response.status_code == 409
+    assert world.db.rolled_back is True
+
+
+def test_passkeys_for_another_site_do_not_count(client, world):
+    # Older passkeys (no recorded site) and ones made on an old demo address can't
+    # sign for this site, so they neither block a new one nor show as set up.
+    world.add(
+        SoftAuthenticator().stored_credential(world.student, rp_id=None),
+        SoftAuthenticator().stored_credential(world.student, rp_id="old-demo.trycloudflare.com"),
+    )
+
+    listed = client.get("/passkeys", headers=auth_header(world.student))
+    response = register(client, world, SoftAuthenticator())
+
+    assert listed.json() == []
+    assert response.status_code == 201
+
+
 # -- Passkey check-in ----------------------------------------------------------------
 
 
@@ -757,3 +839,26 @@ def test_student_cannot_check_in_twice(client, world):
         f"/courses/{world.course.id}/sessions/active", headers=auth_header(world.student)
     )
     assert active.json()["checked_in_at"] is not None
+
+
+def test_passkey_from_another_site_cannot_check_in(client, world):
+    live = world.add(make_live_session(world.course))
+    with_passkey(world)  # the current site's passkey, so options can be issued
+    stale = SoftAuthenticator()
+    world.add(stale.stored_credential(world.student, rp_id="old-demo.trycloudflare.com"))
+
+    response = check_in(client, world, live, stale)
+
+    assert response.status_code == 400
+    assert world.db.of(AttendanceRecord) == []
+
+
+def test_check_in_ignores_passkeys_from_another_site(client, world):
+    live = world.add(make_live_session(world.course))
+    world.add(SoftAuthenticator().stored_credential(world.student, rp_id=None))
+
+    response = client.post(
+        f"/sessions/{live.id}/check-in/options", headers=auth_header(world.student)
+    )
+
+    assert response.status_code == 409
