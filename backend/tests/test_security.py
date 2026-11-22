@@ -57,6 +57,20 @@ def test_decode_supabase_token_accepts_a_validly_signed_token(monkeypatch, setti
     assert payload["sub"] == "e2338ef7-4cc5-4766-8df7-2ffc460c86bd"
 
 
+def test_decode_supabase_token_tolerates_a_server_clock_slightly_behind_supabase(monkeypatch, settings, signing_key):
+    # A token used right after Supabase issues it can carry an `iat` a moment
+    # ahead of this server's clock; that must not be treated as invalid.
+    token = make_token(signing_key, iat=datetime.now(timezone.utc) + timedelta(seconds=5))
+    monkeypatch.setattr(
+        "app.security.supabase_auth._jwks_client",
+        lambda _url: FakeJWKClient(signing_key),
+    )
+
+    payload = decode_supabase_token(token, settings)
+
+    assert payload["sub"] == "e2338ef7-4cc5-4766-8df7-2ffc460c86bd"
+
+
 def test_decode_supabase_token_rejects_a_token_signed_by_a_different_key(monkeypatch, settings, signing_key):
     other_key = ec.generate_private_key(ec.SECP256R1())
     token = make_token(other_key)

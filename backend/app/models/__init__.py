@@ -18,8 +18,8 @@ from app.models.enums import (
     RequestStatus,
     SessionStatus,
 )
-from app.models.face import FaceEnrollment
 from app.models.room import Room
+from app.models.student_face_embedding import StudentFaceEmbedding
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -36,12 +36,12 @@ __all__ = [
     "CourseInstructor",
     "DevicePlatform",
     "Enrollment",
-    "FaceEnrollment",
     "RegisteredDevice",
     "RequestStatus",
     "Room",
     "SessionRequiredCheck",
     "SessionStatus",
+    "StudentFaceEmbedding",
     "User",
     "UserRole",
 ]

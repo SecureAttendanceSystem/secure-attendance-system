@@ -1,1 +1,1 @@
-"""Password hashing and JWT helpers used by app.api.deps and app.api.routes.auth."""
+"""Supabase JWT verification used by the API authentication dependencies."""

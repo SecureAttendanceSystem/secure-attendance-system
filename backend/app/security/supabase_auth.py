@@ -5,6 +5,8 @@ from jwt import PyJWKClient
 
 from app.core.config import Settings
 
+CLOCK_SKEW_LEEWAY_SECONDS = 30
+
 
 @lru_cache
 def _jwks_client(jwks_url: str) -> PyJWKClient:
@@ -22,4 +24,5 @@ def decode_supabase_token(token: str, settings: Settings) -> dict:
         signing_key.key,
         algorithms=["ES256"],
         audience="authenticated",
+        leeway=CLOCK_SKEW_LEEWAY_SECONDS,
     )
