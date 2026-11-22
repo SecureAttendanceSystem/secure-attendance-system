@@ -46,6 +46,11 @@ jobs:
     name: Backend tests and migrations
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Dummy values for ephemeral containers; the local db has no real
+      # Supabase project behind it, and tests monkeypatch their own settings.
+      SUPABASE_URL: https://ci-dummy.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ci-only-dummy-service-role-key
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start backend and database

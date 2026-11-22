@@ -20,6 +20,17 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
+    supabase_url: str
+    supabase_service_role_key: SecretStr
+
+    @field_validator("supabase_url")
+    @classmethod
+    def validate_supabase_url(cls, value: str) -> str:
+        value = value.rstrip("/")
+        url = urlsplit(value)
+        if url.scheme != "https" or not url.hostname or url.path or url.query:
+            raise ValueError("SUPABASE_URL must be a bare https URL, e.g. https://xyz.supabase.co")
+        return value
 
     @field_validator("database_url")
     @classmethod

@@ -1,0 +1,4 @@
+# Personal face photos and generated results stay local.
+same_person/
+different_people/
+*.csv

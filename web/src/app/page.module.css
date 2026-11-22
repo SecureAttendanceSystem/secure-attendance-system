@@ -1,18 +1,847 @@
-.main {
+/* Page shell */
+.page {
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #e5e5e7;
+  --blue: #0071e3;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  padding: 0 40px;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse at 75% 48%, rgb(222 164 255 / 31%), transparent 31%),
+    radial-gradient(ellipse at 29% 56%, rgb(226 237 255 / 54%), transparent 42%),
+    #f5f5f7;
+}
+
+/* Header */
+.header {
+  width: min(100%, 1160px);
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 auto;
+}
+
+/* Brand */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.25px;
+  text-decoration: none;
+}
+
+.brandMark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+  background: #1d1d1f;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.school {
+  color: #6e6e73;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+}
+
+/* Header controls */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.themeToggle {
+  min-height: 36px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 24px;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid rgb(29 29 31 / 14%);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgb(255 255 255 / 62%);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.themeToggle:hover {
+  border-color: rgb(0 113 227 / 40%);
+  background: #fff;
+}
+
+.themeToggle:active {
+  transform: scale(0.97);
+}
+
+.themeIcon {
+  color: var(--blue);
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Main layout */
+.mainLayout {
+  width: min(100%, 1040px);
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  align-items: center;
+  gap: clamp(48px, 8vw, 104px);
+  margin: 14px auto 54px;
+}
+
+/* Introduction */
+.intro {
+  max-width: 500px;
+  padding: 12px 0 12px 8px;
+}
+
+.eyebrow {
+  margin: 0 0 16px;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.15px;
+}
+
+.intro h1 {
+  max-width: 490px;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(46px, 5.2vw, 66px);
+  font-weight: 650;
+  letter-spacing: -4px;
+  line-height: 1.02;
+}
+
+.introCopy {
+  max-width: 410px;
+  margin: 20px 0 28px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+/* Attendance preview */
+.previewCard {
+  position: relative;
+  min-height: 250px;
+  overflow: hidden;
+  padding: 23px 24px;
+  border: 1px solid rgb(255 255 255 / 80%);
+  border-radius: 24px;
+  background: linear-gradient(135deg, #e8eefb 0%, #e8e7f2 54%, #f5e9e9 100%);
+  box-shadow: 0 18px 48px rgb(34 49 78 / 8%);
+}
+
+.previewTopline {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  color: #606778;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.85px;
+}
+
+.previewTitle {
+  position: relative;
+  z-index: 1;
+  margin: 23px 0 18px;
+  color: #242733;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -1.2px;
+  line-height: 1.08;
+}
+
+.classCard {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 350px);
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: 15px;
+  background: rgb(255 255 255 / 78%);
+  box-shadow: 0 7px 22px rgb(41 48 69 / 5%);
+  backdrop-filter: blur(14px);
+}
+
+.classIcon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(145deg, #637be0, #9d7dc5);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.classDetails {
+  display: grid;
+  gap: 4px;
+}
+
+.classDetails strong {
+  color: #282a32;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.classDetails small {
+  color: #777b86;
+  font-size: 9px;
+}
+
+.previewAccent {
+  position: absolute;
+  right: -54px;
+  bottom: -96px;
+  width: 210px;
+  height: 210px;
+  border: 1px solid rgb(255 255 255 / 48%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 13%);
+}
+
+/* Audience note */
+.introNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 19px 0 0;
+  color: #6e6e73;
+  font-size: 11px;
+}
+
+/* Sign-in card */
+.authCard {
+  width: min(100%, 420px);
+  justify-self: end;
+  padding: 36px;
+  border: 1px solid rgb(255 255 255 / 90%);
+  border-radius: 24px;
+  background: rgb(255 255 255 / 88%);
+  box-shadow:
+    0 22px 60px rgb(29 29 31 / 8%),
+    0 2px 8px rgb(29 29 31 / 3%),
+    0 0 74px rgb(206 134 238 / 30%);
+  backdrop-filter: blur(18px);
+}
+
+.cardHeading {
+  margin-bottom: 24px;
+}
+
+.cardHeading .eyebrow {
+  margin-bottom: 10px;
+  font-size: 9px;
+}
+
+.cardHeading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -1.1px;
+}
+
+.cardHeading > p:last-child {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Login and sign-up tabs */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 23px;
+  padding: 4px;
+  border: 1px solid #ededf0;
+  border-radius: 11px;
+  background: #f5f5f7;
+}
+
+/* Use the full tab width when sign-up is temporarily turned off. */
+.loginOnlyTabs {
+  grid-template-columns: 1fr;
+}
+
+.tabs button {
+  min-height: 37px;
+  border: 0;
+  border-radius: 8px;
+  color: #6e6e73;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.tabs .selectedTab {
+  color: #1d1d1f;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(29 29 31 / 10%);
+}
+
+/* Form fields */
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.form label {
+  margin: 0 0 7px;
+  color: #424245;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.form label:not(:first-child) {
+  margin-top: 17px;
+}
+
+.form input {
+  width: 100%;
+  min-height: 47px;
+  padding: 0 13px;
+  border: 1px solid #d2d2d7;
+  border-radius: 10px;
+  outline: none;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.form input::placeholder {
+  color: #9a9aa0;
+}
+
+.form input:focus {
+  border-color: #6aa9ed;
+  box-shadow: 0 0 0 4px rgb(0 113 227 / 12%);
+}
+
+/* Account type */
+.roleButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.roleButtons button {
+  min-height: 42px;
+  border: 1px solid #d2d2d7;
+  border-radius: 10px;
+  color: #6e6e73;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.roleButtons .selectedRole {
+  border-color: #78ade3;
+  color: #075db2;
+  background: #f2f8ff;
+}
+
+/* Face preview */
+.faceSection {
+  display: grid;
+  gap: 10px;
+  margin-top: 19px;
+  padding: 14px;
+  border: 1px solid #e5e5e7;
+  border-radius: 13px;
+  background: #fafafa;
+}
+
+.faceHeading,
+.facePreviewRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.faceHeading > span:first-child,
+.facePreviewRow > span {
+  display: grid;
+  gap: 4px;
+}
+
+.faceHeading strong,
+.facePreviewRow strong {
+  color: #424245;
+  font-size: 11px;
+}
+
+.faceHeading small,
+.facePreviewRow small {
+  color: #86868b;
+  font-size: 10px;
+}
+
+.required {
+  margin-left: auto;
+  color: #6e6e73;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.cameraPreview {
+  height: 140px;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  border: 1px dashed #d2d2d7;
+  border-radius: 10px;
+  color: #86868b;
+  background: #f5f5f7;
+  font-size: 11px;
+}
+
+.cameraPreview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.hiddenCanvas {
+  display: none;
+}
+
+.facePreview {
+  width: 50px;
+  height: 50px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background-position: center;
+  background-size: cover;
+}
+
+.facePreviewRow {
+  min-height: 62px;
+}
+
+/* Camera controls */
+.retakeButton,
+.cameraButton {
+  min-height: 37px;
+  border: 1px solid #d2d2d7;
+  border-radius: 9px;
+  color: #075db2;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.retakeButton {
+  margin-left: auto;
+  padding: 0 10px;
+}
+
+.cameraButton {
+  width: 100%;
+}
+
+.cameraButton:hover,
+.retakeButton:hover {
+  border-color: #78ade3;
+  background: #f5f9ff;
+}
+
+/* Camera consent */
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #6e6e73;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.consent input {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--blue);
+}
+
+/* Form status */
+.error,
+.message {
+  margin: 13px 0 0;
+  padding: 10px 11px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.error {
+  border: 1px solid #f1d0d0;
+  color: #a33f3f;
+  background: #fff6f6;
+}
+
+.message {
+  border: 1px solid #d5e8d9;
+  color: #356b45;
+  background: #f5fbf6;
+}
+
+/* Submit button */
+.submitButton {
+  min-height: 48px;
+  margin-top: 22px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--blue);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.submitButton:hover {
+  background: #0077ed;
+}
+
+.submitButton:active {
+  transform: scale(0.99);
+}
+
+/* Dark theme */
+.dark {
+  --ink: #f5f5f7;
+  --muted: #a1a1a6;
+  --line: #424245;
+  --blue: #2997ff;
+  background:
+    radial-gradient(ellipse at 75% 48%, rgb(151 76 189 / 28%), transparent 32%),
+    radial-gradient(ellipse at 28% 56%, rgb(55 78 132 / 22%), transparent 42%),
+    #111113;
+}
+
+/* Dark header */
+.dark .brandMark {
+  color: #1d1d1f;
+  background: #f5f5f7;
+}
+
+.dark .school,
+.dark .introNote {
+  color: #a1a1a6;
+}
+
+.dark .themeToggle {
+  border-color: #424245;
+  color: #f5f5f7;
+  background: rgb(44 44 46 / 82%);
+}
+
+.dark .themeToggle:hover {
+  border-color: #6aa9ed;
+  background: #3a3a3c;
+}
+
+/* Dark attendance preview */
+.dark .previewCard {
+  border-color: rgb(255 255 255 / 10%);
+  background: linear-gradient(135deg, #292b3d 0%, #30283b 54%, #3b2938 100%);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
+}
+
+.dark .previewTopline {
+  color: #d3d4df;
+}
+
+.dark .classCard {
+  border-color: rgb(255 255 255 / 14%);
+  background: rgb(37 37 43 / 76%);
+}
+
+.dark .previewTitle,
+.dark .classDetails strong {
+  color: #f5f5f7;
+}
+
+.dark .classDetails small,
+.dark .classArrow {
+  color: #b6b5c2;
+}
+
+/* Dark sign-in form */
+.dark .authCard {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(30 30 33 / 90%);
+  box-shadow:
+    0 22px 60px rgb(0 0 0 / 32%),
+    0 0 76px rgb(194 103 228 / 34%);
+}
+
+.dark .tabs {
+  border-color: #3a3a3c;
+  background: #252527;
+}
+
+.dark .tabs button {
+  color: #a1a1a6;
+}
+
+.dark .tabs .selectedTab {
+  color: #f5f5f7;
+  background: #3a3a3c;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+}
+
+.dark .form label,
+.dark .faceHeading strong,
+.dark .facePreviewRow strong {
+  color: #e5e5e7;
+}
+
+.dark .form input {
+  border-color: #515154;
+  color: #f5f5f7;
+  background: #242426;
+}
+
+.dark .form input::placeholder,
+.dark .faceHeading small,
+.dark .facePreviewRow small,
+.dark .required,
+.dark .consent,
+.dark .cardFooter {
+  color: #a1a1a6;
+}
+
+.dark .roleButtons button,
+.dark .retakeButton,
+.dark .cameraButton {
+  border-color: #515154;
+  color: #d6eaff;
+  background: #242426;
+}
+
+.dark .roleButtons .selectedRole {
+  border-color: #4799e6;
+  color: #8cc7ff;
+  background: #1b3042;
+}
+
+.dark .faceSection {
+  border-color: #424245;
+  background: #252527;
+}
+
+.dark .cameraPreview {
+  border-color: #515154;
+  color: #a1a1a6;
+  background: #1c1c1e;
+}
+
+.dark .cameraButton:hover,
+.dark .retakeButton:hover {
+  border-color: #6aa9ed;
+  background: #2b3540;
+}
+
+/* Dark footer */
+.dark .footer {
+  border-color: rgb(255 255 255 / 12%);
+  color: #a1a1a6;
+}
+
+/* Sign-in card footer */
+.cardFooter {
+  margin: 20px 0 0;
+  color: #86868b;
+  font-size: 10px;
   text-align: center;
 }
 
-.main h1 {
-  font-size: clamp(1.5rem, 5vw, 2.5rem);
+/* Page footer */
+.footer {
+  width: min(100%, 1160px);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto;
+  padding: 17px 0 21px;
+  border-top: 1px solid rgb(29 29 31 / 8%);
+  color: #86868b;
+  font-size: 10px;
 }
 
-.main p {
-  line-height: 1.5;
+/* Keyboard focus */
+.page :focus-visible {
+  outline: 3px solid rgb(0 113 227 / 35%);
+  outline-offset: 3px;
+}
+
+/* Tablet layout */
+@media (max-width: 850px) {
+  .page {
+    padding: 0 28px;
+  }
+
+  .mainLayout {
+    width: min(100%, 600px);
+    grid-template-columns: 1fr;
+    gap: 34px;
+    margin: 34px auto 48px;
+  }
+
+  .intro {
+    max-width: none;
+    padding: 0;
+  }
+
+  .intro h1 {
+    max-width: 540px;
+    font-size: clamp(45px, 9vw, 62px);
+  }
+
+  .introCopy {
+    margin: 15px 0 22px;
+  }
+
+  .previewCard {
+    min-height: 225px;
+  }
+
+  .authCard {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
+/* Mobile layout */
+@media (max-width: 520px) {
+  .page {
+    padding: 0 18px;
+  }
+
+  .header {
+    min-height: 66px;
+  }
+
+  .brand {
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .brandMark {
+    width: 31px;
+    height: 31px;
+    border-radius: 10px;
+  }
+
+  .school {
+    display: none;
+  }
+
+  .headerActions {
+    gap: 10px;
+  }
+
+  .themeToggle {
+    min-height: 34px;
+    gap: 6px;
+    padding: 0 9px;
+    font-size: 10px;
+  }
+
+  .mainLayout {
+    gap: 27px;
+    margin: 30px auto 36px;
+  }
+
+  .intro h1 {
+    font-size: clamp(42px, 12vw, 54px);
+    letter-spacing: -2.9px;
+  }
+
+  .introCopy {
+    font-size: 15px;
+  }
+
+  .previewCard {
+    min-height: 218px;
+    padding: 19px;
+    border-radius: 20px;
+  }
+
+  .previewTitle {
+    margin-top: 21px;
+    font-size: 27px;
+  }
+
+  .authCard {
+    padding: 27px 22px;
+    border-radius: 20px;
+  }
+
+  .cardHeading h2 {
+    font-size: 25px;
+  }
+
+  .footer {
+    font-size: 9px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .tabs button,
+  .form input,
+  .roleButtons button,
+  .retakeButton,
+  .cameraButton,
+  .submitButton {
+    transition: none;
+  }
 }

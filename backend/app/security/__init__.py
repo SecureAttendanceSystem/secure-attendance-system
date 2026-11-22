@@ -1,1 +1,1 @@
-"""Authentication and verification helpers for future features."""
+"""Supabase JWT verification used by the API authentication dependencies."""

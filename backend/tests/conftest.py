@@ -12,6 +12,8 @@ def isolated_environment(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
     monkeypatch.setenv("ENVIRONMENT", "test")
     monkeypatch.setenv("LOG_LEVEL", "INFO")
+    monkeypatch.setenv("SUPABASE_URL", "https://test-dummy.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-dummy-service-role-key")
     monkeypatch.delenv("APP_NAME", raising=False)
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
     get_settings.cache_clear()
