@@ -8,6 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
+import LiveAttendance from "@/components/LiveAttendance";
 import { getSupabase } from "@/lib/supabase";
 import styles from "./page.module.css";
 
@@ -19,6 +20,10 @@ type FaceScanResult = { matched: boolean; distance: number };
 
 // Turn this on when self-service sign-up is ready to be shown again.
 const SIGN_UP_ENABLED = false;
+
+// Attendance now uses passkeys (see LiveAttendance). The server-side face scan is kept
+// but disconnected; turn this on to show it again after sign-in.
+const FACE_SCAN_ENABLED = false;
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:18000").replace(/\/$/, "");
 
@@ -227,7 +232,7 @@ export default function Home() {
         const signedIn = await fetchProfile(data.session.access_token);
         resetFaceScan();
         setProfile(signedIn);
-        if (signedIn.role === "student") void startFaceScan();
+        if (FACE_SCAN_ENABLED && signedIn.role === "student") void startFaceScan();
       } catch (profileError) {
         setError(profileError instanceof Error ? profileError.message : "Could not load your profile.");
         await supabase.auth.signOut();
@@ -505,7 +510,8 @@ export default function Home() {
 
           {profile ? (
             <div className={styles.form}>
-              {profile.role === "student" ? (
+              <LiveAttendance role={profile.role} />
+              {!FACE_SCAN_ENABLED ? null : profile.role === "student" ? (
                 <div className={styles.faceSection}>
                   <div className={styles.faceHeading}>
                     <span>

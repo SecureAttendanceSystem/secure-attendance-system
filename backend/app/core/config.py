@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     )
     supabase_url: str
     supabase_service_role_key: SecretStr
+    # WebAuthn relying party: passkeys are bound to this domain, and the
+    # browser-reported origin of every ceremony must be one of these.
+    webauthn_rp_id: str = "localhost"
+    webauthn_rp_name: str = "Secure Attendance"
+    webauthn_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     @field_validator("supabase_url")
     @classmethod

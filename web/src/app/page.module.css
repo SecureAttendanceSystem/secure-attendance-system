@@ -845,3 +845,116 @@
     transition: none;
   }
 }
+
+/* Live attendance (professor sessions, student passkey check-in) */
+.courseBlock {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e5e7;
+}
+
+.sessionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sessionRow > span:first-child {
+  display: grid;
+  flex: 1 1 140px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sessionRow strong {
+  color: #424245;
+  font-size: 11px;
+}
+
+.sessionRow small,
+.mutedNote {
+  color: #86868b;
+  font-size: 10px;
+}
+
+.sessionRow .retakeButton {
+  min-height: 30px;
+}
+
+.mutedNote {
+  margin: 0;
+}
+
+.liveBadge,
+.presentBadge,
+.absentBadge {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.liveBadge {
+  color: #fff;
+  background: #d93a3a;
+}
+
+.presentBadge {
+  color: #356b45;
+  background: #e3f3e7;
+}
+
+.absentBadge {
+  color: #6e6e73;
+  background: #ededf0;
+}
+
+.rosterList {
+  display: grid;
+  gap: 6px;
+}
+
+.rosterList ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rosterList li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  color: #424245;
+  font-size: 11px;
+}
+
+.dark .courseBlock {
+  border-color: #424245;
+}
+
+.dark .sessionRow strong,
+.dark .rosterList li {
+  color: #e5e5e7;
+}
+
+.dark .sessionRow small,
+.dark .mutedNote {
+  color: #a1a1a6;
+}
+
+.dark .presentBadge {
+  color: #9fd8ae;
+  background: #1f3626;
+}
+
+.dark .absentBadge {
+  color: #a1a1a6;
+  background: #2c2c2e;
+}
