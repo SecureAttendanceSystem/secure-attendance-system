@@ -1,0 +1,34 @@
+from datetime import datetime
+from typing import Annotated
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+# Lengths match the columns in app.models.course.Course.
+CourseCode = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
+CourseTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+CourseTerm = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=16)]
+
+
+class CourseCreate(BaseModel):
+    code: CourseCode
+    title: CourseTitle
+    term: CourseTerm
+
+
+class CoursePublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    code: str
+    title: str
+    term: str
+
+
+class RosterStudent(BaseModel):
+    """One enrolled student as shown to admins and the course's professors."""
+
+    id: UUID
+    email: str
+    full_name: str
+    enrolled_at: datetime
