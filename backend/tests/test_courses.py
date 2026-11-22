@@ -1,12 +1,35 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_db_session
 from app.models.course import Course, CourseInstructor, Enrollment
 from app.models.user import User, UserRole
-from app.security.tokens import create_access_token
+
+# Tokens are signed with a throwaway key and the Supabase JWKS lookup is
+# patched to return it, so get_current_user runs its real verification path.
+SIGNING_KEY = ec.generate_private_key(ec.SECP256R1())
+
+
+class FakeSigningKey:
+    def __init__(self, key):
+        self.key = key
+
+
+class FakeJWKClient:
+    def get_signing_key_from_jwt(self, _token):
+        return FakeSigningKey(SIGNING_KEY.public_key())
+
+
+@pytest.fixture(autouse=True)
+def fake_supabase_jwks(monkeypatch):
+    monkeypatch.setattr(
+        "app.security.supabase_auth._jwks_client", lambda _url: FakeJWKClient()
+    )
 
 
 class FakeScalarResult:
@@ -75,7 +98,6 @@ def make_user(role=UserRole.STUDENT, **overrides):
         id=uuid4(),
         email=f"{role.value}-{uuid4().hex[:6]}@unb.ca",
         full_name="Test User",
-        password_hash="not-used-in-these-tests",
         role=role,
         is_active=True,
     )
@@ -94,8 +116,19 @@ def use_session(app, session):
     return session
 
 
-def auth_header(settings, user):
-    token = create_access_token(user_id=user.id, role=user.role, settings=settings)
+def auth_header(_settings, user):
+    now = datetime.now(timezone.utc)
+    token = jwt.encode(
+        {
+            "sub": str(user.id),
+            "aud": "authenticated",
+            "role": "authenticated",
+            "iat": now,
+            "exp": now + timedelta(hours=1),
+        },
+        SIGNING_KEY,
+        algorithm="ES256",
+    )
     return {"Authorization": f"Bearer {token}"}
 
 
