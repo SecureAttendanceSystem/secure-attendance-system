@@ -25,16 +25,21 @@ class AttendanceRecord(Base):
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    session_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("class_sessions.id"))
-    student_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("users.id"))
+    session_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("class_sessions.id", ondelete="CASCADE")
+    )
+    student_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
     status: Mapped[AttendanceStatus] = mapped_column(
         enum_column(AttendanceStatus, "attendance_status")
     )
     checked_in_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    device_id: Mapped[UUID | None] = mapped_column(
-        Uuid, ForeignKey("registered_devices.id")
+    # The passkey whose verified assertion recorded this check-in, if any.
+    passkey_credential_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("passkey_credentials.id", ondelete="SET NULL")
     )
     reviewed_by: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("users.id"))
     review_note: Mapped[str | None] = mapped_column(Text)
