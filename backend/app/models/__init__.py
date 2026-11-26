@@ -11,7 +11,6 @@ from app.models.course import Course, CourseInstructor, Enrollment
 from app.models.device import RegisteredDevice
 from app.models.enums import (
     AttendanceStatus,
-    ChallengePurpose,
     ChangeType,
     CheckKind,
     CheckOutcome,
@@ -19,7 +18,6 @@ from app.models.enums import (
     RequestStatus,
     SessionStatus,
 )
-from app.models.passkey import PasskeyCredential, WebAuthnChallenge
 from app.models.room import Room
 from app.models.student_face_embedding import StudentFaceEmbedding
 from app.models.user import User, UserRole
@@ -28,7 +26,6 @@ __all__ = [
     "AttendanceRecord",
     "AttendanceStatus",
     "AuditLog",
-    "ChallengePurpose",
     "ChangeRequest",
     "ChangeType",
     "CheckKind",
@@ -39,7 +36,6 @@ __all__ = [
     "CourseInstructor",
     "DevicePlatform",
     "Enrollment",
-    "PasskeyCredential",
     "RegisteredDevice",
     "RequestStatus",
     "Room",
@@ -48,5 +44,4 @@ __all__ = [
     "StudentFaceEmbedding",
     "User",
     "UserRole",
-    "WebAuthnChallenge",
 ]

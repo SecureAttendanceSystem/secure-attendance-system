@@ -28,7 +28,6 @@ class CheckKind(str, Enum):
     BLE = "ble"
     FACE = "face"
     QR = "qr"
-    PASSKEY = "passkey"
 
 
 class CheckOutcome(str, Enum):
@@ -44,11 +43,6 @@ class AttendanceStatus(str, Enum):
     FLAGGED = "flagged"
     EXCUSED = "excused"
     ABSENT = "absent"
-
-
-class ChallengePurpose(str, Enum):
-    PASSKEY_REGISTRATION = "passkey_registration"
-    CHECK_IN = "check_in"
 
 
 class ChangeType(str, Enum):
