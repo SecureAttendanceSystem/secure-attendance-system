@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Uuid, func, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
@@ -14,24 +14,14 @@ class ClassSession(Base):
         # The naming convention turns this into ck_class_sessions_time_order.
         CheckConstraint("scheduled_end > scheduled_start", name="time_order"),
         Index("ix_class_sessions_course_id_scheduled_start", "course_id", "scheduled_start"),
-        # At most one live session per course; ended sessions stay as history.
-        Index(
-            "uq_class_sessions_active_course",
-            "course_id",
-            unique=True,
-            postgresql_where=text("status = 'active'"),
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
-    course_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("courses.id", ondelete="CASCADE")
-    )
-    # Room and schedule are optional so a professor can start a session on the spot.
-    room_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("rooms.id"))
+    course_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("courses.id"))
+    room_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("rooms.id"))
     started_by: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("users.id"))
-    scheduled_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    scheduled_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scheduled_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    scheduled_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     actual_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     actual_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[SessionStatus] = mapped_column(
